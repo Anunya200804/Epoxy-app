@@ -1,0 +1,387 @@
+@page "/users"
+@inject EpoxyDbContext Db
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+
+<PageTitle>จัดการผู้ใช้งาน - ระบบการจัดการพื้น Epoxy</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-1" style="font-weight: 700; color: var(--primary);">
+            <i class="bi bi-person-gear me-2"></i>จัดการผู้ใช้งาน (User Management)
+        </h2>
+        <p class="text-muted mb-0">จัดการบัญชีผู้ใช้งาน สิทธิ์การใช้งาน และข้อมูลส่วนบุคคล</p>
+    </div>
+    <button class="btn-custom btn-primary-custom" @onclick="OpenAddModal">
+        <i class="bi bi-person-plus-fill"></i> เพิ่มผู้ใช้งานใหม่
+    </button>
+</div>
+
+<!-- Search Bar -->
+<div class="search-bar-panel">
+    <div class="search-input-wrapper">
+        <i class="bi bi-search"></i>
+        <input type="text" class="form-control-custom" placeholder="ค้นหาตามชื่อผู้ใช้ หรือชื่อเต็ม..." @bind="searchTerm" @bind:event="oninput" style="padding-left: 40px;" />
+    </div>
+    <select class="form-control-custom" style="max-width: 220px;" @bind="filterRole" @bind:event="onchange">
+        <option value="">แสดงทุกบทบาท</option>
+        <option value="Admin">ผู้ดูแลระบบ</option>
+        <option value="ProjectManager">ผู้จัดการโครงการ</option>
+        <option value="Staff">พนักงานทั่วไป</option>
+    </select>
+    <button class="btn-custom btn-secondary-custom" @onclick="ClearSearch">
+        <i class="bi bi-x-circle"></i> ล้างค่า
+    </button>
+</div>
+
+<!-- Summary Badges -->
+<div class="d-flex gap-3 mb-4 flex-wrap">
+    <div class="stat-card" style="flex: 1; min-width: 180px;">
+        <div class="stat-info">
+            <span class="stat-label">ผู้ใช้งานทั้งหมด</span>
+            <span class="stat-value">@allUsers.Count</span>
+        </div>
+        <div class="stat-icon"><i class="bi bi-people-fill"></i></div>
+    </div>
+    <div class="stat-card success" style="flex: 1; min-width: 180px;">
+        <div class="stat-info">
+            <span class="stat-label">Admin</span>
+            <span class="stat-value">@allUsers.Count(u => u.Role == UserRole.Admin)</span>
+        </div>
+        <div class="stat-icon"><i class="bi bi-shield-lock-fill"></i></div>
+    </div>
+    <div class="stat-card warning" style="flex: 1; min-width: 180px;">
+        <div class="stat-info">
+            <span class="stat-label">Project Manager</span>
+            <span class="stat-value">@allUsers.Count(u => u.Role == UserRole.ProjectManager)</span>
+        </div>
+        <div class="stat-icon"><i class="bi bi-briefcase-fill"></i></div>
+    </div>
+    <div class="stat-card" style="flex: 1; min-width: 180px;">
+        <div class="stat-info">
+            <span class="stat-label">Staff</span>
+            <span class="stat-value">@allUsers.Count(u => u.Role == UserRole.Staff)</span>
+        </div>
+        <div class="stat-icon"><i class="bi bi-person-fill"></i></div>
+    </div>
+</div>
+
+<!-- Users Table -->
+<div class="card-panel">
+    <div class="panel-header">
+        <h3 class="panel-title">
+            <i class="bi bi-table text-primary"></i>
+            <span>รายชื่อผู้ใช้งานระบบ</span>
+        </h3>
+        <span class="text-muted" style="font-size: 0.85rem;">พบ @FilteredUsers.Count() รายการ</span>
+    </div>
+    <div class="custom-table-container">
+        <table class="custom-table" id="users-table">
+            <thead>
+                <tr>
+                    <th style="width: 50px;">#</th>
+                    <th>ชื่อผู้ใช้งาน</th>
+                    <th>ชื่อ-นามสกุล</th>
+                    <th>เบอร์โทรศัพท์</th>
+                    <th>บทบาทหน้าที่</th>
+                    <th style="width: 180px; text-align: center;">จัดการ</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (FilteredUsers.Any())
+                {
+                    @foreach (var (user, idx) in FilteredUsers.Select((u, i) => (u, i + 1)))
+                    {
+                        <tr>
+                            <td>@idx</td>
+                            <td><strong>@user.Username</strong></td>
+                            <td>@user.FullName</td>
+                            <td>@user.Phone</td>
+                            <td>
+                                <span class="badge-role badge-@user.Role.ToString().ToLower()">
+                                    <i class="bi @GetRoleIcon(user.Role)"></i>
+                                    @GetRoleName(user.Role)
+                                </span>
+                            </td>
+                            <td style="text-align: center;">
+                                <button class="btn btn-sm btn-outline-primary me-1" title="แก้ไข" @onclick="() => OpenEditModal(user)">
+                                    <i class="bi bi-pencil-square"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" title="ลบ" @onclick="() => ConfirmDelete(user)">
+                                    <i class="bi bi-trash3"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">
+                            <i class="bi bi-search" style="font-size: 1.5rem; display: block; margin-bottom: 8px; opacity: 0.4;"></i>
+                            ไม่พบผู้ใช้งานตามเงื่อนไขที่กำหนด
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add/Edit Modal -->
+@if (showModal)
+{
+    <div class="modal-overlay" @onclick="CloseModal">
+        <div class="modal-content-custom" @onclick:stopPropagation="true">
+            <div class="modal-header-custom">
+                <h3><i class="bi @(isEditing ? "bi-pencil-square" : "bi-person-plus-fill") me-2"></i>@(isEditing ? "แก้ไขข้อมูลผู้ใช้งาน" : "เพิ่มผู้ใช้งานใหม่")</h3>
+                <button class="modal-close-btn" @onclick="CloseModal">&times;</button>
+            </div>
+            <div class="modal-body-custom">
+                @if (!string.IsNullOrEmpty(modalError))
+                {
+                    <div class="alert alert-danger d-flex align-items-center gap-2" style="font-size: 0.875rem;">
+                        <i class="bi bi-exclamation-triangle-fill"></i> @modalError
+                    </div>
+                }
+                <div class="form-group">
+                    <label class="form-label">ชื่อผู้ใช้งาน <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control-custom" placeholder="กรอกชื่อบัญชีผู้ใช้" @bind="editUser.Username" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">@(isEditing ? "รหัสผ่านใหม่ (เว้นว่างหากไม่ต้องการเปลี่ยน)" : "รหัสผ่าน *")</label>
+                    <input type="password" class="form-control-custom" placeholder="@(isEditing ? "เว้นว่างเพื่อคงรหัสผ่านเดิม" : "กรอกรหัสผ่าน")" @bind="newPassword" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">ชื่อ-นามสกุล <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control-custom" placeholder="กรอกชื่อและนามสกุล" @bind="editUser.FullName" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">เบอร์โทรศัพท์</label>
+                    <input type="text" class="form-control-custom" placeholder="08x-xxx-xxxx" @bind="editUser.Phone" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">บทบาทหน้าที่ <span class="text-danger">*</span></label>
+                    <select class="form-control-custom" @bind="editUser.Role">
+                        <option value="@UserRole.Admin">ผู้ดูแลระบบ</option>
+                        <option value="@UserRole.ProjectManager">ผู้จัดการโครงการ</option>
+                        <option value="@UserRole.Staff">พนักงานทั่วไป</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer-custom">
+                <button class="btn-custom btn-secondary-custom" @onclick="CloseModal">
+                    <i class="bi bi-x-lg"></i> ยกเลิก
+                </button>
+                <button class="btn-custom btn-primary-custom" @onclick="SaveUser">
+                    <i class="bi bi-check-lg"></i> @(isEditing ? "บันทึกการแก้ไข" : "เพิ่มผู้ใช้งาน")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Delete Confirmation Modal -->
+@if (showDeleteConfirm)
+{
+    <div class="modal-overlay" @onclick="CancelDelete">
+        <div class="modal-content-custom" style="max-width: 450px;" @onclick:stopPropagation="true">
+            <div class="modal-header-custom" style="background-color: var(--danger);">
+                <h3><i class="bi bi-exclamation-triangle-fill me-2"></i>ยืนยันการลบ</h3>
+                <button class="modal-close-btn" @onclick="CancelDelete">&times;</button>
+            </div>
+            <div class="modal-body-custom text-center" style="padding: 32px;">
+                <i class="bi bi-person-x-fill" style="font-size: 3rem; color: var(--danger); display: block; margin-bottom: 16px;"></i>
+                <p style="font-size: 1rem; margin-bottom: 8px;">คุณต้องการลบบัญชีผู้ใช้งาน</p>
+                <p style="font-weight: 700; font-size: 1.15rem; color: var(--primary);">@deleteTarget?.FullName (@deleteTarget?.Username)</p>
+                <p class="text-muted" style="font-size: 0.85rem;">การดำเนินการนี้ไม่สามารถเรียกคืนได้</p>
+            </div>
+            <div class="modal-footer-custom">
+                <button class="btn-custom btn-secondary-custom" @onclick="CancelDelete">
+                    <i class="bi bi-x-lg"></i> ยกเลิก
+                </button>
+                <button class="btn-custom" style="background-color: var(--danger); color: white;" @onclick="DeleteUser">
+                    <i class="bi bi-trash3"></i> ยืนยันลบ
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<User> allUsers = new();
+    private string searchTerm = string.Empty;
+    private string filterRole = string.Empty;
+
+    // Modal state
+    private bool showModal = false;
+    private bool isEditing = false;
+    private User editUser = new();
+    private string newPassword = string.Empty;
+    private string modalError = string.Empty;
+
+    // Delete state
+    private bool showDeleteConfirm = false;
+    private User? deleteTarget = null;
+
+    private IEnumerable<User> FilteredUsers => allUsers
+        .Where(u => string.IsNullOrEmpty(searchTerm) ||
+                     u.Username.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                     u.FullName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+        .Where(u => string.IsNullOrEmpty(filterRole) ||
+                     u.Role.ToString() == filterRole)
+        .OrderBy(u => u.Role)
+        .ThenBy(u => u.FullName);
+
+    protected override void OnInitialized()
+    {
+        LoadUsers();
+    }
+
+    private void LoadUsers()
+    {
+        allUsers = Db.Users.ToList();
+    }
+
+    // --- Add / Edit ---
+    private void OpenAddModal()
+    {
+        isEditing = false;
+        editUser = new User { Role = UserRole.Staff };
+        newPassword = string.Empty;
+        modalError = string.Empty;
+        showModal = true;
+    }
+
+    private void OpenEditModal(User user)
+    {
+        isEditing = true;
+        editUser = new User
+        {
+            Id = user.Id,
+            Username = user.Username,
+            PasswordHash = user.PasswordHash,
+            FullName = user.FullName,
+            Phone = user.Phone,
+            Role = user.Role
+        };
+        newPassword = string.Empty;
+        modalError = string.Empty;
+        showModal = true;
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        modalError = string.Empty;
+    }
+
+    private void SaveUser()
+    {
+        modalError = string.Empty;
+
+        // Validation
+        if (string.IsNullOrWhiteSpace(editUser.Username))
+        {
+            modalError = "กรุณากรอกชื่อผู้ใช้งาน";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(editUser.FullName))
+        {
+            modalError = "กรุณากรอกชื่อ-นามสกุล";
+            return;
+        }
+        if (!isEditing && string.IsNullOrWhiteSpace(newPassword))
+        {
+            modalError = "กรุณากรอกรหัสผ่าน";
+            return;
+        }
+
+        // Check duplicate username
+        var isDuplicate = Db.Users.Any(u => u.Username.ToLower() == editUser.Username.ToLower() && u.Id != editUser.Id);
+        if (isDuplicate)
+        {
+            modalError = "ชื่อผู้ใช้งานนี้มีอยู่ในระบบแล้ว";
+            return;
+        }
+
+        if (isEditing)
+        {
+            var existing = Db.Users.Find(editUser.Id);
+            if (existing != null)
+            {
+                existing.Username = editUser.Username;
+                existing.FullName = editUser.FullName;
+                existing.Phone = editUser.Phone;
+                existing.Role = editUser.Role;
+                if (!string.IsNullOrWhiteSpace(newPassword))
+                {
+                    existing.PasswordHash = newPassword;
+                }
+                Db.SaveChanges();
+            }
+        }
+        else
+        {
+            editUser.PasswordHash = newPassword;
+            Db.Users.Add(editUser);
+            Db.SaveChanges();
+        }
+
+        LoadUsers();
+        showModal = false;
+    }
+
+    // --- Delete ---
+    private void ConfirmDelete(User user)
+    {
+        deleteTarget = user;
+        showDeleteConfirm = true;
+    }
+
+    private void CancelDelete()
+    {
+        deleteTarget = null;
+        showDeleteConfirm = false;
+    }
+
+    private void DeleteUser()
+    {
+        if (deleteTarget != null)
+        {
+            var user = Db.Users.Find(deleteTarget.Id);
+            if (user != null)
+            {
+                Db.Users.Remove(user);
+                Db.SaveChanges();
+            }
+            LoadUsers();
+        }
+        showDeleteConfirm = false;
+        deleteTarget = null;
+    }
+
+    // --- Clear Search ---
+    private void ClearSearch()
+    {
+        searchTerm = string.Empty;
+        filterRole = string.Empty;
+    }
+
+    // --- Helpers ---
+    private string GetRoleName(UserRole role) => role switch
+    {
+        UserRole.Admin => "ผู้ดูแลระบบ",
+        UserRole.ProjectManager => "ผู้จัดการโครงการ",
+        UserRole.Staff => "พนักงานทั่วไป",
+        _ => ""
+    };
+
+    private string GetRoleIcon(UserRole role) => role switch
+    {
+        UserRole.Admin => "bi-shield-lock-fill",
+        UserRole.ProjectManager => "bi-briefcase-fill",
+        UserRole.Staff => "bi-person-fill",
+        _ => "bi-person"
+    };
+}

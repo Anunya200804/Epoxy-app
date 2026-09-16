@@ -1,0 +1,1110 @@
+@page "/customers"
+@page "/technicians"
+@inject EpoxyDbContext Db
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+
+<PageTitle>จัดการข้อมูลลูกค้าและทีมช่าง - ระบบการจัดการพื้น Epoxy</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-1" style="font-weight: 700; color: var(--primary);">จัดการข้อมูลลูกค้าและทีมช่าง</h2>
+        <p class="text-muted mb-0">ระบบบันทึก ค้นหา และบริหารจัดการข้อมูลลูกค้า พนักงานช่าง และกลุ่มทีมงานช่าง</p>
+    </div>
+    @if (AuthService.CurrentUser?.Role == UserRole.Admin || AuthService.CurrentUser?.Role == UserRole.ProjectManager)
+    {
+        <div class="d-flex gap-2">
+            @if (activeTab == "customers")
+            {
+                <button class="btn-custom btn-primary-custom" @onclick="OpenAddCustomerModal">
+                    <i class="bi bi-person-plus-fill"></i> เพิ่มลูกค้าใหม่
+                </button>
+            }
+            else if (activeTab == "techs")
+            {
+                <button class="btn-custom btn-primary-custom" @onclick="OpenAddTechModal">
+                    <i class="bi bi-person-plus-fill"></i> เพิ่มพนักงานช่าง
+                </button>
+            }
+            else if (activeTab == "teams")
+            {
+                <button class="btn-custom btn-primary-custom" @onclick="OpenAddTeamModal">
+                    <i class="bi bi-people-fill"></i> สร้างทีมช่างใหม่
+                </button>
+            }
+        </div>
+    }
+</div>
+
+<!-- Tabs layout -->
+<div class="card-panel">
+    <div class="d-flex border-bottom mb-4 gap-2">
+        <button class="btn pb-2 px-3 @(activeTab == "customers" ? "border-bottom border-primary border-3 fw-bold text-primary" : "text-muted")" style="background: none; border: none; border-radius: 0;" @onclick='() => SetTab("customers")'>
+            <i class="bi bi-people-fill"></i> ข้อมูลลูกค้า (@customers.Count)
+        </button>
+        <button class="btn pb-2 px-3 @(activeTab == "techs" ? "border-bottom border-primary border-3 fw-bold text-primary" : "text-muted")" style="background: none; border: none; border-radius: 0;" @onclick='() => SetTab("techs")'>
+            <i class="bi bi-person-badge-fill"></i> รายชื่อพนักงานช่าง (@technicians.Count)
+        </button>
+        <button class="btn pb-2 px-3 @(activeTab == "teams" ? "border-bottom border-primary border-3 fw-bold text-primary" : "text-muted")" style="background: none; border: none; border-radius: 0;" @onclick='() => SetTab("teams")'>
+            <i class="bi bi-people-fill"></i> จัดการกลุ่มทีมช่าง (@teams.Count)
+        </button>
+    </div>
+
+    @if (activeTab == "customers")
+    {
+        <!-- Customer Search Panel -->
+        <div class="search-bar-panel">
+            <div class="search-input-wrapper">
+                <i class="bi bi-search"></i>
+                <input type="text" class="form-control-custom" placeholder="ค้นหาด้วยชื่อลูกค้า หรือ เบอร์โทรศัพท์..." @bind="customerSearchQuery" @bind:event="oninput" @onkeyup="SearchCustomers" />
+            </div>
+            <button class="btn-custom btn-secondary-custom" @onclick="ClearCustomerSearch">ล้างค่า</button>
+        </div>
+
+        <!-- Customer Table -->
+        <div class="custom-table-container">
+            <table class="custom-table">
+                <thead>
+                    <tr>
+                        <th>รหัสลูกค้า</th>
+                        <th>ชื่อลูกค้า / บริษัท</th>
+                        <th>เบอร์โทรศัพท์</th>
+                        <th>ไลน์ไอดี</th>
+                        <th>ที่อยู่ติดตั้ง</th>
+                        <th>วันที่บันทึก</th>
+                        <th class="text-center no-print">จัดการ</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (filteredCustomers.Any())
+                    {
+                        @foreach (var c in filteredCustomers)
+                        {
+                            <tr>
+                                <td><strong>CUST-@c.Id</strong></td>
+                                <td>@c.Name</td>
+                                <td><a href="tel:@c.Phone">@c.Phone</a></td>
+                                <td>@(string.IsNullOrEmpty(c.LineId) ? "-" : c.LineId)</td>
+                                <td style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@c.Address</td>
+                                <td>@c.CreatedDate.ToString("dd/MM/yyyy HH:mm")</td>
+                                <td class="text-center no-print">
+                                    <div class="d-flex justify-content-center gap-2">
+                                        <button class="btn btn-sm btn-outline-primary" title="แก้ไข" @onclick="() => OpenEditCustomerModal(c)">
+                                            <i class="bi bi-pencil-fill"></i>
+                                        </button>
+                                        @if (AuthService.CurrentUser?.Role == UserRole.Admin)
+                                        {
+                                            <button class="btn btn-sm btn-outline-danger" title="ลบ" @onclick="() => ConfirmDeleteCustomer(c)">
+                                                <i class="bi bi-trash-fill"></i>
+                                            </button>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-4">ไม่พบข้อมูลลูกค้าที่ค้นหา</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else if (activeTab == "techs")
+    {
+        <!-- Today's Attendance Summary -->
+        <div style="
+            background: linear-gradient(135deg, rgba(99,102,241,0.08), rgba(168,85,247,0.08));
+            border: 1px solid rgba(99,102,241,0.2);
+            border-radius: 14px;
+            padding: 14px 20px;
+            margin-bottom: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        ">
+            <div style="display: flex; gap: 24px; align-items: center;">
+                <span style="font-weight: 700; color: var(--text-primary); font-size: 0.95rem;">
+                    <i class="bi bi-calendar-check" style="margin-right: 6px; color: var(--primary);"></i>
+                    สถานะวันนี้ (@DateTime.Today.ToString("dd/MM/yyyy"))
+                </span>
+                <span style="font-size: 0.85rem;"><span style="color: #22c55e; font-weight: 700;">@GetTodayCount(AttendanceStatus.Working)</span> ทำงาน</span>
+                <span style="font-size: 0.85rem;"><span style="color: #f59e0b; font-weight: 700;">@GetTodayCount(AttendanceStatus.Leave)</span> ลา</span>
+                <span style="font-size: 0.85rem;"><span style="color: #ef4444; font-weight: 700;">@GetTodayCount(AttendanceStatus.Absent)</span> ขาด</span>
+            </div>
+            <button class="btn-custom btn-primary-custom" style="padding: 6px 16px; font-size: 0.85rem;" @onclick="SaveAllAttendanceToday">
+                <i class="bi bi-save"></i> บันทึกสถานะวันนี้
+            </button>
+        </div>
+
+        <!-- Tech Search and filters -->
+        <div class="search-bar-panel">
+            <div class="search-input-wrapper">
+                <i class="bi bi-search"></i>
+                <input type="text" class="form-control-custom" placeholder="ค้นหาด้วยชื่อช่าง หรือ เบอร์โทรศัพท์..." @bind="techSearchQuery" @bind:event="oninput" @onkeyup="SearchTechs" />
+            </div>
+            <select class="form-control-custom" style="width: auto; min-width: 180px;" @bind="filterTeamId" @bind:after="SearchTechs">
+                <option value="0">-- ทุกทีม --</option>
+                @foreach (var team in teams)
+                {
+                    <option value="@team.Id">@team.TeamName</option>
+                }
+            </select>
+            <button class="btn-custom btn-secondary-custom" @onclick="ClearTechSearch">ล้างค่า</button>
+        </div>
+
+        <!-- Techs Table -->
+        <div class="custom-table-container">
+            <table class="custom-table">
+                <thead>
+                    <tr>
+                        <th>รหัสพนักงาน</th>
+                        <th>ชื่อ-นามสกุล</th>
+                        <th>เบอร์โทรศัพท์</th>
+                        <th>ตำแหน่ง</th>
+                        <th>กลุ่มทีมสังกัด</th>
+                        <th class="text-center">สถานะวันนี้</th>
+                        @if (AuthService.CurrentUser?.Role == UserRole.Admin || AuthService.CurrentUser?.Role == UserRole.ProjectManager)
+                        {
+                            <th class="text-center no-print">จัดการ</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (filteredTechs.Any())
+                    {
+                        @foreach (var t in filteredTechs)
+                        {
+                            var techId = t.Id;
+                            <tr>
+                                <td><strong>TECH-@t.Id</strong></td>
+                                <td><strong>@t.FullName</strong></td>
+                                <td><a href="tel:@t.Phone">@t.Phone</a></td>
+                                <td>@t.Position</td>
+                                <td>
+                                    <span class="badge-status badge-approved" style="font-size: 0.75rem;">@(t.Team?.TeamName ?? "ไม่มีสังกัด")</span>
+                                </td>
+                                <td class="text-center">
+                                    <select class="form-control-custom" style="
+                                        width: auto; min-width: 120px; padding: 4px 10px; font-size: 0.82rem; font-weight: 600; text-align: center;
+                                        background: @GetAttendanceBgColor(GetTodayAttendance(techId));
+                                        color: @GetAttendanceTextColor(GetTodayAttendance(techId));
+                                        border-color: @GetAttendanceTextColor(GetTodayAttendance(techId));
+                                    " value="@((int)GetTodayAttendance(techId))" @onchange="(e) => SetTodayAttendance(techId, e)">
+                                        <option value="0">✅ ทำงาน</option>
+                                        <option value="1">พัก ลา</option>
+                                        <option value="2">❌ ขาด</option>
+                                    </select>
+                                </td>
+                                @if (AuthService.CurrentUser?.Role == UserRole.Admin || AuthService.CurrentUser?.Role == UserRole.ProjectManager)
+                                {
+                                    <td class="text-center no-print">
+                                        <div class="d-flex justify-content-center gap-2">
+                                            <button class="btn btn-sm btn-outline-info" title="ดูประวัติ" @onclick="() => OpenAttendanceHistoryModal(t)">
+                                                <i class="bi bi-clock-history"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-primary" title="แก้ไข" @onclick="() => OpenEditTechModal(t)">
+                                                <i class="bi bi-pencil-fill"></i>
+                                            </button>
+                                            @if (AuthService.CurrentUser?.Role == UserRole.Admin)
+                                            {
+                                                <button class="btn btn-sm btn-outline-danger" title="ลบ" @onclick="() => ConfirmDeleteTech(t)">
+                                                    <i class="bi bi-trash-fill"></i>
+                                                </button>
+                                            }
+                                        </div>
+                                    </td>
+                                }
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-4">ไม่พบข้อมูลช่างพนักงาน</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else if (activeTab == "teams")
+    {
+        <!-- Teams List -->
+        <div class="custom-table-container">
+            <table class="custom-table">
+                <thead>
+                    <tr>
+                        <th>รหัสทีม</th>
+                        <th>ชื่อทีมช่าง</th>
+                        <th>หัวหน้าทีม</th>
+                        <th>จำนวนพนักงานในทีม</th>
+                        <th class="text-center no-print">จัดการ</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (teams.Any())
+                    {
+                        @foreach (var team in teams)
+                        {
+                            <tr>
+                                <td><strong>TEAM-@team.Id</strong></td>
+                                <td><strong>@team.TeamName</strong></td>
+                                <td>@team.LeaderName</td>
+                                <td>@team.Technicians.Count คน</td>
+                                <td class="text-center no-print">
+                                    <div class="d-flex justify-content-center gap-2">
+                                        <button class="btn btn-sm btn-outline-primary" title="แก้ไขทีม" @onclick="() => OpenEditTeamModal(team)">
+                                            <i class="bi bi-pencil-fill"></i>
+                                        </button>
+                                        @if (AuthService.CurrentUser?.Role == UserRole.Admin)
+                                        {
+                                            <button class="btn btn-sm btn-outline-danger" title="ลบทีม" @onclick="() => ConfirmDeleteTeam(team)">
+                                                <i class="bi bi-trash-fill"></i>
+                                            </button>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-4">ไม่มีกลุ่มทีมช่างบันทึกในระบบ</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<!-- Modal Popup for Add/Edit Customer -->
+@if (isCustomerModalOpen)
+{
+    <div class="modal-overlay">
+        <div class="modal-content-custom">
+            <div class="modal-header-custom">
+                <h3>@(editingCustomer.Id == 0 ? "เพิ่มลูกค้าใหม่" : "แก้ไขข้อมูลลูกค้า")</h3>
+                <button class="modal-close-btn" @onclick="CloseCustomerModal">&times;</button>
+            </div>
+            <div>
+                <div class="modal-body-custom">
+                    <div class="form-group">
+                        <label class="form-label" for="cust-name">ชื่อลูกค้า / ชื่อบริษัท *</label>
+                        <input type="text" id="cust-name" class="form-control-custom" @bind="editingCustomer.Name" required placeholder="เช่น บริษัท กขค จำกัด หรือ คุณเอส พัฒนาการ" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="cust-phone">เบอร์โทรศัพท์ *</label>
+                        <input type="text" id="cust-phone" class="form-control-custom" @bind="editingCustomer.Phone" required placeholder="เช่น 0812345678" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="cust-line">ไลน์ไอดี</label>
+                        <input type="text" id="cust-line" class="form-control-custom" @bind="editingCustomer.LineId" placeholder="เช่น somchai_line" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="cust-address">ที่อยู่สำหรับติดตั้งงาน *</label>
+                        <textarea id="cust-address" class="form-control-custom" rows="3" @bind="editingCustomer.Address" required placeholder="กรอกที่อยู่ติดตั้งโดยละเอียด"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer-custom">
+                    <button type="button" class="btn-custom btn-secondary-custom" @onclick="CloseCustomerModal">ยกเลิก</button>
+                    <button type="button" class="btn-custom btn-primary-custom" @onclick="SaveCustomer">บันทึกข้อมูล</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Modal Popup for Add/Edit Technician -->
+@if (isTechModalOpen)
+{
+    <div class="modal-overlay">
+        <div class="modal-content-custom">
+            <div class="modal-header-custom">
+                <h3>@(editingTech.Id == 0 ? "เพิ่มพนักงานช่างใหม่" : "แก้ไขข้อมูลพนักงานช่าง")</h3>
+                <button class="modal-close-btn" @onclick="CloseTechModal">&times;</button>
+            </div>
+            <div>
+                <div class="modal-body-custom">
+                    <div class="form-group">
+                        <label class="form-label" for="tech-name">ชื่อ-นามสกุล *</label>
+                        <input type="text" id="tech-name" class="form-control-custom" @bind="editingTech.FullName" required placeholder="เช่น นายประหยัด ว่องไว" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="tech-phone">เบอร์โทรศัพท์ *</label>
+                        <input type="text" id="tech-phone" class="form-control-custom" @bind="editingTech.Phone" required placeholder="เช่น 084xxxxxxx" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="tech-pos">ตำแหน่งงาน *</label>
+                        <input type="text" id="tech-pos" class="form-control-custom" @bind="editingTech.Position" required placeholder="เช่น หัวหน้าทีมช่าง, ช่างเคลือบ Epoxy, ช่างเตรียมพื้นผิว" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="tech-team">สังกัดกลุ่มทีมช่าง</label>
+                        <select id="tech-team" class="form-control-custom" @bind="editingTech.TeamId">
+                            <option value="">-- ไม่สังกัดทีม (ช่างรับจ้างอิสระ) --</option>
+                            @foreach (var team in teams)
+                            {
+                                <option value="@team.Id">@team.TeamName</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">สถานะการทำงาน</label>
+                        <select class="form-control-custom" @bind="editingTech.Status">
+                            <option value="Available">ว่าง</option>
+                            <option value="Busy">ไม่ว่าง (มีงานติดตั้ง)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer-custom">
+                    <button type="button" class="btn-custom btn-secondary-custom" @onclick="CloseTechModal">ยกเลิก</button>
+                    <button type="button" class="btn-custom btn-primary-custom" @onclick="SaveTech">บันทึกข้อมูล</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Modal Popup for Add/Edit Team -->
+@if (isTeamModalOpen)
+{
+    <div class="modal-overlay">
+        <div class="modal-content-custom" style="max-width: 650px; width: 95%;">
+            <div class="modal-header-custom">
+                <h3>@(editingTeam.Id == 0 ? "สร้างทีมช่างใหม่" : "แก้ไขกลุ่มทีมช่าง")</h3>
+                <button class="modal-close-btn" @onclick="CloseTeamModal">&times;</button>
+            </div>
+            <div>
+                <div class="modal-body-custom" style="max-height: 65vh; overflow-y: auto;">
+                    <div class="form-group">
+                        <label class="form-label" for="team-name">ชื่อทีมช่าง *</label>
+                        <input type="text" id="team-name" class="form-control-custom" @bind="editingTeam.TeamName" required placeholder="เช่น ทีมช่าง A (งานใหญ่พิเศษ)" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="team-leader">ชื่อหัวหน้าทีม *</label>
+                        <input type="text" id="team-leader" class="form-control-custom" @bind="editingTeam.LeaderName" required placeholder="เช่น ช่างแก้ว หรือ ช่างสมศรี" />
+                    </div>
+
+                    @if (editingTeam.Id != 0)
+                    {
+                        <hr style="border-color: rgba(255,255,255,0.1); margin: 20px 0;" />
+                        <h4 style="margin: 0 0 10px 0; font-size: 0.95rem; font-weight: 700; color: var(--text-primary);">
+                            <i class="bi bi-people-fill" style="margin-right: 6px; color: var(--primary);"></i>
+                            สมาชิกในทีม (@(technicians.Count(t => t.TeamId == editingTeam.Id)) คน)
+                        </h4>
+
+                        <div class="custom-table-container mb-3" style="max-height: 200px; overflow-y: auto;">
+                            <table class="custom-table" style="font-size: 0.85rem; margin-bottom: 0;">
+                                <thead>
+                                    <tr>
+                                        <th>ชื่อ-นามสกุล</th>
+                                        <th>ตำแหน่ง</th>
+                                        <th class="text-center">การจัดการ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @{
+                                        var teamMembers = technicians.Where(t => t.TeamId == editingTeam.Id).ToList();
+                                        if (teamMembers.Any())
+                                        {
+                                            @foreach (var member in teamMembers)
+                                            {
+                                                var currentMember = member;
+                                                <tr>
+                                                    <td><strong>@currentMember.FullName</strong></td>
+                                                    <td>@currentMember.Position</td>
+                                                    <td class="text-center">
+                                                        <button type="button" class="btn btn-sm btn-outline-danger" style="padding: 2px 8px; font-size: 0.75rem;" 
+                                                                @onclick="() => RemoveMemberFromTeam(currentMember)">
+                                                            <i class="bi bi-person-dash"></i> นำออก
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <tr>
+                                                <td colspan="3" class="text-center text-muted py-3">ยังไม่มีสมาชิกในทีมนี้</td>
+                                            </tr>
+                                        }
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Add existing technician dropdown -->
+                        <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+                            <label class="form-label" style="font-size: 0.8rem; font-weight: 600;">ดึงพนักงานที่มีอยู่เข้าทีมนี้</label>
+                            <div style="display: flex; gap: 10px;">
+                                <select class="form-control-custom" style="font-size: 0.85rem; padding: 6px 12px;" @bind="selectedUnassignedTechId">
+                                    <option value="0">-- เลือกพนักงานช่างที่ยังไม่มีทีม --</option>
+                                    @foreach (var tech in technicians.Where(t => t.TeamId == null || t.TeamId == 0))
+                                    {
+                                        <option value="@tech.Id">@tech.FullName (@tech.Position)</option>
+                                    }
+                                </select>
+                                <button type="button" class="btn-custom btn-primary-custom" style="padding: 6px 16px; font-size: 0.85rem; white-space: nowrap;" 
+                                        @onclick="AddExistingTechToTeam" disabled="@(selectedUnassignedTechId == 0)">
+                                    <i class="bi bi-person-plus"></i> ดึงเข้าทีม
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Create & add new technician directly to team -->
+                        <div style="display: flex; justify-content: flex-end;">
+                            <button type="button" class="btn-custom btn-secondary-custom" style="padding: 6px 12px; font-size: 0.8rem; border-color: rgba(255,255,255,0.15);" 
+                                    @onclick="OpenAddTechDirectlyToTeamModal">
+                                <i class="bi bi-person-plus-fill" style="color: var(--primary);"></i> สร้างพนักงานใหม่และบรรจุเข้าทีมนี้
+                            </button>
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer-custom">
+                    <button type="button" class="btn-custom btn-secondary-custom" @onclick="CloseTeamModal">ยกเลิก</button>
+                    <button type="button" class="btn-custom btn-primary-custom" @onclick="SaveTeam">บันทึกข้อมูลทีม</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Customer Delete Confirmation Modal -->
+@if (customerToDelete != null)
+{
+    <div class="modal-overlay">
+        <div class="modal-content-custom" style="max-width: 400px;">
+            <div class="modal-header-custom bg-danger">
+                <h3>ยืนยันการลบข้อมูลลูกค้า</h3>
+                <button class="modal-close-btn" @onclick="CancelDeleteCustomer">&times;</button>
+            </div>
+            <div class="modal-body-custom text-center py-4">
+                <i class="bi bi-exclamation-triangle-fill text-danger mb-3" style="font-size: 3rem; display: block;"></i>
+                <p>คุณต้องการลบข้อมูลลูกค้า <strong>@customerToDelete.Name</strong> ใช่หรือไม่?</p>
+                <p class="text-danger small">การลบข้อมูลลูกค้าจะส่งผลให้ข้อมูลใบเสนอราคาและโครงการที่เกี่ยวข้องถูกลบไปด้วย</p>
+            </div>
+            <div class="modal-footer-custom">
+                <button type="button" class="btn-custom btn-secondary-custom" @onclick="CancelDeleteCustomer">ยกเลิก</button>
+                <button type="button" class="btn-custom btn-danger" @onclick="DeleteCustomer" style="background-color: var(--danger); color: white;">ลบข้อมูล</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Tech Delete Confirmation Modal -->
+@if (techToDelete != null)
+{
+    <div class="modal-overlay">
+        <div class="modal-content-custom" style="max-width: 400px;">
+            <div class="modal-header-custom bg-danger">
+                <h3>ยืนยันการลบช่างพนักงาน</h3>
+                <button class="modal-close-btn" @onclick="CancelDeleteTech">&times;</button>
+            </div>
+            <div class="modal-body-custom text-center py-4">
+                <i class="bi bi-exclamation-triangle-fill text-danger mb-3" style="font-size: 3rem; display: block;"></i>
+                <p>คุณต้องการลบข้อมูลพนักงานช่าง <strong>@techToDelete.FullName</strong> ใช่หรือไม่?</p>
+            </div>
+            <div class="modal-footer-custom">
+                <button type="button" class="btn-custom btn-secondary-custom" @onclick="CancelDeleteTech">ยกเลิก</button>
+                <button type="button" class="btn-custom btn-danger" @onclick="DeleteTech" style="background-color: var(--danger); color: white;">ลบข้อมูล</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Team Delete Confirmation Modal -->
+@if (teamToDelete != null)
+{
+    <div class="modal-overlay">
+        <div class="modal-content-custom" style="max-width: 400px;">
+            <div class="modal-header-custom bg-danger">
+                <h3>ยืนยันการลบทีมช่าง</h3>
+                <button class="modal-close-btn" @onclick="CancelDeleteTeam">&times;</button>
+            </div>
+            <div class="modal-body-custom text-center py-4">
+                <i class="bi bi-exclamation-triangle-fill text-danger mb-3" style="font-size: 3rem; display: block;"></i>
+                <p>คุณต้องการลบกลุ่มทีมช่าง <strong>@teamToDelete.TeamName</strong> ใช่หรือไม่?</p>
+                <p class="text-danger small">พนักงานทั้งหมดในทีมนี้จะถูกปรับย้ายไปเป็นช่างไม่มีสังกัดชั่วคราว</p>
+            </div>
+            <div class="modal-footer-custom">
+                <button type="button" class="btn-custom btn-secondary-custom" @onclick="CancelDeleteTeam">ยกเลิก</button>
+                <button type="button" class="btn-custom btn-danger" @onclick="DeleteTeam" style="background-color: var(--danger); color: white;">ลบข้อมูล</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Modal Popup for Attendance History -->
+@if (isAttendanceHistoryOpen && selectedAttendanceTech != null)
+{
+    <div class="modal-overlay">
+        <div class="modal-content-custom" style="max-width: 600px; width: 95%;">
+            <div class="modal-header-custom" style="background: linear-gradient(135deg, #0284c7, #0ea5e9);">
+                <h3><i class="bi bi-clock-history" style="margin-right: 8px;"></i>ประวัติการทำงานของ @selectedAttendanceTech.FullName</h3>
+                <button class="modal-close-btn" @onclick="CloseAttendanceHistoryModal">&times;</button>
+            </div>
+            <div>
+                <div class="modal-body-custom" style="max-height: 60vh; overflow-y: auto;">
+                    <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px; margin-bottom: 16px; font-size: 0.9rem; line-height: 1.6;">
+                        <div><strong>ชื่อ-นามสกุล:</strong> @selectedAttendanceTech.FullName</div>
+                        <div><strong>ตำแหน่ง:</strong> @selectedAttendanceTech.Position</div>
+                        <div><strong>กลุ่มทีมสังกัด:</strong> @(selectedAttendanceTech.Team?.TeamName ?? "ไม่มีสังกัด")</div>
+                    </div>
+
+                    <h4 style="margin: 0 0 10px 0; font-size: 0.95rem; font-weight: 700; color: var(--text-primary);">บันทึกประวัติการทำงานล่าสุด (ย้อนหลังสูงสุด 60 วัน)</h4>
+                    <div class="custom-table-container">
+                        <table class="custom-table" style="font-size: 0.85rem;">
+                            <thead>
+                                <tr>
+                                    <th>วันที่</th>
+                                    <th>สถานะ</th>
+                                    <th>ผู้บันทึก</th>
+                                    <th>หมายเหตุ</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (attendanceHistory.Any())
+                                {
+                                    @foreach (var record in attendanceHistory)
+                                    {
+                                        var currentRecord = record;
+                                        <tr>
+                                            <td><strong>@currentRecord.Date.ToString("dd/MM/yyyy")</strong></td>
+                                            <td>
+                                                <span class="badge-status @GetAttendanceBadgeClass(currentRecord.Status)">
+                                                    @GetAttendanceStatusText(currentRecord.Status)
+                                                </span>
+                                            </td>
+                                            <td>@currentRecord.RecordedBy</td>
+                                            <td>
+                                                <input type="text" class="form-control-custom" style="padding: 2px 6px; font-size: 0.8rem; margin: 0; background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1);" 
+                                                       value="@currentRecord.Note" @onchange="(e) => SaveAttendanceNote(currentRecord.Id, e.Value?.ToString())" placeholder="คลิกเพื่อเพิ่มโน้ต..." />
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                                else
+                                {
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted py-4">ไม่มีประวัติการทำงานบันทึกไว้</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer-custom">
+                    <button type="button" class="btn-custom btn-secondary-custom" @onclick="CloseAttendanceHistoryModal">ปิดหน้าต่าง</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private string activeTab = "customers";
+    private string customerSearchQuery = string.Empty;
+    private string techSearchQuery = string.Empty;
+    private string filterStatus = string.Empty;
+
+    private List<Customer> customers = new();
+    private List<Customer> filteredCustomers = new();
+    private List<Technician> technicians = new();
+    private List<Technician> filteredTechs = new();
+    private List<TechnicianTeam> teams = new();
+
+    // Modal states
+    private bool isCustomerModalOpen = false;
+    private Customer editingCustomer = new();
+    private bool isTechModalOpen = false;
+    private Technician editingTech = new();
+    private bool isTeamModalOpen = false;
+    private TechnicianTeam editingTeam = new();
+
+    // Attendance states
+    private Dictionary<int, AttendanceStatus> todayAttendanceMap = new();
+    private bool isAttendanceHistoryOpen = false;
+    private Technician? selectedAttendanceTech = null;
+    private List<TechnicianAttendance> attendanceHistory = new();
+    // Delete states
+    private Customer? customerToDelete = null;
+    private Technician? techToDelete = null;
+    private TechnicianTeam? teamToDelete = null;
+
+    // Filter
+    private int filterTeamId = 0;
+    private int selectedUnassignedTechId = 0;
+
+    protected override void OnInitialized()
+    {
+        var uri = NavigationManager.Uri.ToLower();
+        if (uri.Contains("technicians"))
+        {
+            activeTab = "techs";
+        }
+        else
+        {
+            activeTab = "customers";
+        }
+        LoadAllData();
+    }
+
+    private void LoadAllData()
+    {
+        customers = Db.Customers.OrderByDescending(c => c.Id).ToList();
+        teams = Db.TechnicianTeams.Include(t => t.Technicians).OrderBy(t => t.Id).ToList();
+        technicians = Db.Technicians.Include(t => t.Team).OrderByDescending(t => t.Id).ToList();
+        
+        LoadTodayAttendance();
+        SearchCustomers();
+        SearchTechs();
+    }
+
+    private void LoadTodayAttendance()
+    {
+        var today = DateTime.Today;
+        var records = Db.TechnicianAttendances
+            .Where(a => a.Date.Date == today)
+            .ToList();
+
+        todayAttendanceMap = new Dictionary<int, AttendanceStatus>();
+        foreach (var tech in technicians)
+        {
+            var record = records.FirstOrDefault(r => r.TechnicianId == tech.Id);
+            todayAttendanceMap[tech.Id] = record?.Status ?? AttendanceStatus.Working;
+        }
+    }
+
+    private void SetTab(string tab)
+    {
+        activeTab = tab;
+    }
+
+    // Customer Search and CRUD Actions
+    private void SearchCustomers()
+    {
+        if (string.IsNullOrWhiteSpace(customerSearchQuery))
+        {
+            filteredCustomers = customers;
+        }
+        else
+        {
+            var q = customerSearchQuery.ToLower();
+            filteredCustomers = customers
+                .Where(c => c.Name.ToLower().Contains(q) || c.Phone.Contains(q) || (c.LineId != null && c.LineId.ToLower().Contains(q)))
+                .ToList();
+        }
+    }
+
+    private void ClearCustomerSearch()
+    {
+        customerSearchQuery = string.Empty;
+        SearchCustomers();
+    }
+
+    private void OpenAddCustomerModal()
+    {
+        editingCustomer = new Customer();
+        isCustomerModalOpen = true;
+    }
+
+    private void OpenEditCustomerModal(Customer customer)
+    {
+        editingCustomer = new Customer
+        {
+            Id = customer.Id,
+            Name = customer.Name,
+            Phone = customer.Phone,
+            Address = customer.Address,
+            LineId = customer.LineId,
+            CreatedDate = customer.CreatedDate
+        };
+        isCustomerModalOpen = true;
+    }
+
+    private void CloseCustomerModal()
+    {
+        isCustomerModalOpen = false;
+    }
+
+    private void SaveCustomer()
+    {
+        if (editingCustomer.Id == 0)
+        {
+            editingCustomer.CreatedDate = DateTime.Now;
+            Db.Customers.Add(editingCustomer);
+        }
+        else
+        {
+            var existing = Db.Customers.Find(editingCustomer.Id);
+            if (existing != null)
+            {
+                existing.Name = editingCustomer.Name;
+                existing.Phone = editingCustomer.Phone;
+                existing.Address = editingCustomer.Address;
+                existing.LineId = editingCustomer.LineId;
+                Db.Customers.Update(existing);
+            }
+        }
+        
+        Db.SaveChanges();
+        isCustomerModalOpen = false;
+        LoadAllData();
+    }
+
+    private void ConfirmDeleteCustomer(Customer customer)
+    {
+        customerToDelete = customer;
+    }
+
+    private void CancelDeleteCustomer()
+    {
+        customerToDelete = null;
+    }
+
+    private void DeleteCustomer()
+    {
+        if (customerToDelete != null)
+        {
+            Db.Customers.Remove(customerToDelete);
+            Db.SaveChanges();
+            customerToDelete = null;
+            LoadAllData();
+        }
+    }
+
+    // Technician Search, Toggle Status and CRUD Actions
+    private void SearchTechs()
+    {
+        if (string.IsNullOrWhiteSpace(techSearchQuery))
+        {
+            filteredTechs = technicians;
+        }
+        else
+        {
+            var q = techSearchQuery.ToLower();
+            filteredTechs = technicians
+                .Where(t => t.FullName.ToLower().Contains(q) || t.Phone.Contains(q) || t.Position.ToLower().Contains(q))
+                .ToList();
+        }
+
+        if (filterTeamId > 0)
+        {
+            filteredTechs = filteredTechs.Where(t => t.TeamId == filterTeamId).ToList();
+        }
+    }
+
+    private void ClearTechSearch()
+    {
+        techSearchQuery = string.Empty;
+        filterTeamId = 0;
+        SearchTechs();
+    }
+
+    // --- Attendance methods ---
+    private AttendanceStatus GetTodayAttendance(int techId)
+    {
+        return todayAttendanceMap.TryGetValue(techId, out var status) ? status : AttendanceStatus.Working;
+    }
+
+    private void SetTodayAttendance(int techId, ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var val))
+        {
+            todayAttendanceMap[techId] = (AttendanceStatus)val;
+        }
+    }
+
+    private int GetTodayCount(AttendanceStatus status)
+    {
+        return todayAttendanceMap.Count(x => x.Value == status);
+    }
+
+    private void SaveAllAttendanceToday()
+    {
+        var today = DateTime.Today;
+        var currentUser = AuthService.CurrentUser?.FullName ?? "System";
+
+        foreach (var kvp in todayAttendanceMap)
+        {
+            var existing = Db.TechnicianAttendances
+                .FirstOrDefault(a => a.TechnicianId == kvp.Key && a.Date.Date == today);
+
+            if (existing != null)
+            {
+                existing.Status = kvp.Value;
+                existing.RecordedBy = currentUser;
+                Db.TechnicianAttendances.Update(existing);
+            }
+            else
+            {
+                Db.TechnicianAttendances.Add(new TechnicianAttendance
+                {
+                    TechnicianId = kvp.Key,
+                    Date = today,
+                    Status = kvp.Value,
+                    RecordedBy = currentUser
+                });
+            }
+        }
+        Db.SaveChanges();
+    }
+
+    private void OpenAttendanceHistoryModal(Technician tech)
+    {
+        selectedAttendanceTech = tech;
+        attendanceHistory = Db.TechnicianAttendances
+            .Where(a => a.TechnicianId == tech.Id)
+            .OrderByDescending(a => a.Date)
+            .Take(60)
+            .ToList();
+        isAttendanceHistoryOpen = true;
+    }
+
+    private void CloseAttendanceHistoryModal()
+    {
+        isAttendanceHistoryOpen = false;
+        selectedAttendanceTech = null;
+        attendanceHistory = new();
+    }
+
+    private void SaveAttendanceNote(int recordId, string? note)
+    {
+        var record = Db.TechnicianAttendances.Find(recordId);
+        if (record != null)
+        {
+            record.Note = note ?? string.Empty;
+            Db.TechnicianAttendances.Update(record);
+            Db.SaveChanges();
+            if (selectedAttendanceTech != null)
+            {
+                attendanceHistory = Db.TechnicianAttendances
+                    .Where(a => a.TechnicianId == selectedAttendanceTech.Id)
+                    .OrderByDescending(a => a.Date)
+                    .Take(60)
+                    .ToList();
+            }
+        }
+    }
+
+    private void RemoveMemberFromTeam(Technician member)
+    {
+        member.TeamId = null;
+        Db.Technicians.Update(member);
+        Db.SaveChanges();
+        LoadAllData();
+    }
+
+    private void AddExistingTechToTeam()
+    {
+        if (selectedUnassignedTechId > 0 && editingTeam.Id > 0)
+        {
+            var tech = Db.Technicians.Find(selectedUnassignedTechId);
+            if (tech != null)
+            {
+                tech.TeamId = editingTeam.Id;
+                Db.Technicians.Update(tech);
+                Db.SaveChanges();
+                selectedUnassignedTechId = 0;
+                LoadAllData();
+            }
+        }
+    }
+
+    private void OpenAddTechDirectlyToTeamModal()
+    {
+        editingTech = new Technician
+        {
+            Status = TechnicianStatus.Available,
+            TeamId = editingTeam.Id
+        };
+        isTechModalOpen = true;
+    }
+
+    private string GetAttendanceStatusText(AttendanceStatus status) => status switch
+    {
+        AttendanceStatus.Working => "ทำงาน",
+        AttendanceStatus.Leave => "ลา",
+        AttendanceStatus.Absent => "ขาด",
+        _ => ""
+    };
+
+    private string GetAttendanceBadgeClass(AttendanceStatus status) => status switch
+    {
+        AttendanceStatus.Working => "badge-approved",
+        AttendanceStatus.Leave => "badge-draft",
+        AttendanceStatus.Absent => "badge-cancelled",
+        _ => ""
+    };
+
+    private string GetAttendanceBgColor(AttendanceStatus status) => status switch
+    {
+        AttendanceStatus.Working => "rgba(34,197,94,0.12)",
+        AttendanceStatus.Leave => "rgba(245,158,11,0.12)",
+        AttendanceStatus.Absent => "rgba(239,68,68,0.12)",
+        _ => "transparent"
+    };
+
+    private string GetAttendanceTextColor(AttendanceStatus status) => status switch
+    {
+        AttendanceStatus.Working => "#22c55e",
+        AttendanceStatus.Leave => "#f59e0b",
+        AttendanceStatus.Absent => "#ef4444",
+        _ => "var(--text-primary)"
+    };
+
+    private void ToggleTechStatus(Technician tech)
+    {
+        tech.Status = tech.Status == TechnicianStatus.Available ? TechnicianStatus.Busy : TechnicianStatus.Available;
+        Db.Technicians.Update(tech);
+        Db.SaveChanges();
+        LoadAllData();
+    }
+
+    private void OpenAddTechModal()
+    {
+        editingTech = new Technician { Status = TechnicianStatus.Available };
+        isTechModalOpen = true;
+    }
+
+    private void OpenEditTechModal(Technician tech)
+    {
+        editingTech = new Technician
+        {
+            Id = tech.Id,
+            FullName = tech.FullName,
+            Phone = tech.Phone,
+            Position = tech.Position,
+            TeamId = tech.TeamId,
+            Status = tech.Status
+        };
+        isTechModalOpen = true;
+    }
+
+    private void CloseTechModal()
+    {
+        isTechModalOpen = false;
+    }
+
+    private void SaveTech()
+    {
+        if (editingTech.Id == 0)
+        {
+            Db.Technicians.Add(editingTech);
+        }
+        else
+        {
+            var existing = Db.Technicians.Find(editingTech.Id);
+            if (existing != null)
+            {
+                existing.FullName = editingTech.FullName;
+                existing.Phone = editingTech.Phone;
+                existing.Position = editingTech.Position;
+                existing.TeamId = editingTech.TeamId;
+                existing.Status = editingTech.Status;
+                Db.Technicians.Update(existing);
+            }
+        }
+        Db.SaveChanges();
+        isTechModalOpen = false;
+        LoadAllData();
+    }
+
+    private void ConfirmDeleteTech(Technician tech)
+    {
+        techToDelete = tech;
+    }
+
+    private void CancelDeleteTech()
+    {
+        techToDelete = null;
+    }
+
+    private void DeleteTech()
+    {
+        if (techToDelete != null)
+        {
+            Db.Technicians.Remove(techToDelete);
+            Db.SaveChanges();
+            techToDelete = null;
+            LoadAllData();
+        }
+    }
+
+    // Team CRUD Actions
+    private void OpenAddTeamModal()
+    {
+        editingTeam = new TechnicianTeam();
+        isTeamModalOpen = true;
+    }
+
+    private void OpenEditTeamModal(TechnicianTeam team)
+    {
+        editingTeam = new TechnicianTeam
+        {
+            Id = team.Id,
+            TeamName = team.TeamName,
+            LeaderName = team.LeaderName
+        };
+        isTeamModalOpen = true;
+    }
+
+    private void CloseTeamModal()
+    {
+        isTeamModalOpen = false;
+    }
+
+    private void SaveTeam()
+    {
+        if (editingTeam.Id == 0)
+        {
+            Db.TechnicianTeams.Add(editingTeam);
+        }
+        else
+        {
+            var existing = Db.TechnicianTeams.Find(editingTeam.Id);
+            if (existing != null)
+            {
+                existing.TeamName = editingTeam.TeamName;
+                existing.LeaderName = editingTeam.LeaderName;
+                Db.TechnicianTeams.Update(existing);
+            }
+        }
+        Db.SaveChanges();
+        isTeamModalOpen = false;
+        LoadAllData();
+    }
+
+    private void ConfirmDeleteTeam(TechnicianTeam team)
+    {
+        teamToDelete = team;
+    }
+
+    private void CancelDeleteTeam()
+    {
+        teamToDelete = null;
+    }
+
+    private void DeleteTeam()
+    {
+        if (teamToDelete != null)
+        {
+            Db.TechnicianTeams.Remove(teamToDelete);
+            Db.SaveChanges();
+            teamToDelete = null;
+            LoadAllData();
+        }
+    }
+
+    private string GetStatusText(TechnicianStatus status) => status switch
+    {
+        TechnicianStatus.Available => "ว่าง",
+        TechnicianStatus.Busy => "ไม่ว่าง",
+        _ => ""
+    };
+}

@@ -1,0 +1,332 @@
+@page "/finance"
+@inject EpoxyDbContext Db
+@inject AuthService AuthService
+
+<PageTitle>รายรับ-รายจ่าย - ระบบการจัดการพื้น Epoxy</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-1" style="font-weight: 700; color: var(--primary);">บันทึกบัญชีรายรับ - รายจ่าย</h2>
+        <p class="text-muted mb-0">ระบบบันทึกความเคลื่อนไหวทางบัญชี รายรับมัดจำ/งวดสุดท้าย และรายจ่ายซื้อของ/ค่าจ้างแรงงาน</p>
+    </div>
+    @if (AuthService.CurrentUser?.Role == UserRole.Admin)
+    {
+        <button class="btn-custom btn-primary-custom" @onclick="OpenAddModal">
+            <i class="bi bi-plus-circle-fill"></i> เพิ่มบันทึกบัญชีใหม่
+        </button>
+    }
+</div>
+
+<!-- Ledger Summary Cards -->
+<div class="dashboard-grid animate-stagger">
+    <div class="stat-card success" style="padding: 20px;">
+        <div class="stat-info">
+            <span class="stat-label">รายรับสะสมทั้งหมด</span>
+            <span class="stat-value" style="color: var(--success);">฿@totalIncome.ToString("N0")</span>
+        </div>
+        <div class="stat-icon"><i class="bi bi-arrow-down-left-circle-fill"></i></div>
+    </div>
+    <div class="stat-card danger" style="padding: 20px;">
+        <div class="stat-info">
+            <span class="stat-label">รายจ่ายสะสมทั้งหมด</span>
+            <span class="stat-value" style="color: var(--danger);">฿@totalExpense.ToString("N0")</span>
+        </div>
+        <div class="stat-icon"><i class="bi bi-arrow-up-right-circle-fill"></i></div>
+    </div>
+    <div class="stat-card @(netProfit >= 0 ? "success" : "danger")" style="padding: 20px;">
+        <div class="stat-info">
+            <span class="stat-label">ยอดคงเหลือสุทธิ</span>
+            <span class="stat-value" style="color: @(netProfit >= 0 ? "var(--success)" : "var(--danger)");">
+                ฿@netProfit.ToString("N0")
+            </span>
+        </div>
+        <div class="stat-icon"><i class="bi bi-cash-stack"></i></div>
+    </div>
+</div>
+
+<!-- Search Panel -->
+<div class="card-panel">
+    <div class="search-bar-panel">
+        <div class="search-input-wrapper">
+            <i class="bi bi-search"></i>
+            <input type="text" class="form-control-custom" placeholder="ค้นหาด้วยคำอธิบายรายการ หรือ อ้างอิงเลขใบเสร็จ..." @bind="searchQuery" @bind:event="oninput" @onkeyup="FilterLedger" />
+        </div>
+        <select class="form-control-custom" style="width: auto; min-width: 150px;" @bind="filterType" @bind:after="FilterLedger">
+            <option value="">-- ประเภทธุรกรรมทั้งหมด --</option>
+            <option value="Income">รายรับ (+)</option>
+            <option value="Expense">รายจ่าย (-)</option>
+        </select>
+        <button class="btn-custom btn-secondary-custom" @onclick="ClearSearch">ล้างค่า</button>
+    </div>
+
+    <!-- Table -->
+    <div class="custom-table-container">
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>รหัสบัญชี</th>
+                    <th>วันที่บันทึก</th>
+                    <th>ประเภท</th>
+                    <th>คำอธิบายรายการ</th>
+                    <th>เลขที่อ้างอิง</th>
+                    <th class="text-end">จำนวนเงิน</th>
+                    @if (AuthService.CurrentUser?.Role == UserRole.Admin)
+                    {
+                        <th class="text-center no-print">จัดการ</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @if (filteredLedger.Any())
+                {
+                    @foreach (var f in filteredLedger)
+                    {
+                        <tr>
+                            <td><strong>FIN-@f.Id</strong></td>
+                            <td>@f.RecordedDate.ToString("dd/MM/yyyy HH:mm")</td>
+                            <td>
+                                <span class="badge-status badge-@(f.Type == FinanceType.Income ? "approved" : "cancelled")">
+                                    @(f.Type == FinanceType.Income ? "รายรับ" : "รายจ่าย")
+                                </span>
+                            </td>
+                            <td>@f.Description</td>
+                            <td>@(string.IsNullOrEmpty(f.ReferenceNo) ? "-" : f.ReferenceNo)</td>
+                            <td class="text-end" style="font-weight: 700; color: @(f.Type == FinanceType.Income ? "var(--success)" : "var(--danger)");">
+                                @(f.Type == FinanceType.Income ? "+" : "-") ฿@f.Amount.ToString("N0")
+                            </td>
+                            @if (AuthService.CurrentUser?.Role == UserRole.Admin)
+                            {
+                                <td class="text-center no-print">
+                                    <div class="d-flex justify-content-center gap-2">
+                                        <button class="btn btn-sm btn-outline-primary" title="แก้ไข" @onclick="() => OpenEditModal(f)">
+                                            <i class="bi bi-pencil-fill"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" title="ลบ" @onclick="() => ConfirmDelete(f)">
+                                            <i class="bi bi-trash-fill"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            }
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-4">ไม่พบรายการทางการเงินตามคำค้นหา</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal Popup for Add/Edit -->
+@if (isModalOpen)
+{
+    <div class="modal-overlay">
+        <div class="modal-content-custom">
+            <div class="modal-header-custom">
+                <h3>@(editingEntry.Id == 0 ? "เพิ่มบันทึกรายรับ-รายจ่าย" : "แก้ไขบันทึกทางบัญชี")</h3>
+                <button class="modal-close-btn" @onclick="CloseModal">&times;</button>
+            </div>
+            <div>
+                <div class="modal-body-custom">
+                    <div class="form-group">
+                        <label class="form-label" for="fin-type">ประเภทธุรกรรม *</label>
+                        <select id="fin-type" class="form-control-custom" @bind="editingEntry.Type" required>
+                            <option value="Income">รายรับ (บวกเงินเข้า)</option>
+                            <option value="Expense">รายจ่าย (หักเงินออก)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="fin-amount">จำนวนเงิน (บาท) *</label>
+                        <input type="number" step="1" min="1" id="fin-amount" class="form-control-custom" @bind="editingEntry.Amount" required placeholder="เช่น 5000" />
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="fin-desc">คำอธิบายรายการ *</label>
+                        <input type="text" id="fin-desc" class="form-control-custom" @bind="editingEntry.Description" required placeholder="เช่น ซื้อสีเคลือบ Epoxy เพิ่มเติม หรือ จ่ายเบี้ยเลี้ยงช่าง" />
+                    </div>
+
+                    <div class="row" style="display: flex; gap: 12px; margin-bottom: 12px;">
+                        <div class="form-group" style="flex: 1;">
+                            <label class="form-label" for="fin-ref">เลขที่เอกสารอ้างอิง</label>
+                            <input type="text" id="fin-ref" class="form-control-custom" @bind="editingEntry.ReferenceNo" placeholder="เช่น EXP-2003 หรือ REC-1002" />
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label class="form-label" for="fin-date">วันที่บันทึกบัญชี</label>
+                            <input type="datetime-local" id="fin-date" class="form-control-custom" @bind="editingEntry.RecordedDate" required />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer-custom">
+                    <button type="button" class="btn-custom btn-secondary-custom" @onclick="CloseModal">ยกเลิก</button>
+                    <button type="button" class="btn-custom btn-primary-custom" @onclick="SaveFinance">บันทึกรายการ</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Delete Confirmation Modal -->
+@if (entryToDelete != null)
+{
+    <div class="modal-overlay">
+        <div class="modal-content-custom" style="max-width: 400px;">
+            <div class="modal-header-custom bg-danger">
+                <h3>ยืนยันการลบบันทึกการเงิน</h3>
+                <button class="modal-close-btn" @onclick="CancelDelete">&times;</button>
+            </div>
+            <div class="modal-body-custom text-center py-4">
+                <i class="bi bi-exclamation-triangle-fill text-danger mb-3" style="font-size: 3rem; display: block;"></i>
+                <p>คุณต้องการลบข้อมูลรายการการเงิน <strong>@entryToDelete.Description</strong> ใช่หรือไม่?</p>
+                <p class="text-danger small">การลบจะทำให้ยอดงบดุลและรายงานสุทธิคลาดเคลื่อน</p>
+            </div>
+            <div class="modal-footer-custom">
+                <button type="button" class="btn-custom btn-secondary-custom" @onclick="CancelDelete">ยกเลิก</button>
+                <button type="button" class="btn-custom btn-danger" @onclick="DeleteFinance" style="background-color: var(--danger); color: white;">ลบข้อมูล</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Finance> ledger = new();
+    private List<Finance> filteredLedger = new();
+
+    private string searchQuery = string.Empty;
+    private string filterType = string.Empty;
+
+    // Totals
+    private decimal totalIncome = 0;
+    private decimal totalExpense = 0;
+    private decimal netProfit => totalIncome - totalExpense;
+
+    // Modal state
+    private bool isModalOpen = false;
+    private Finance editingEntry = new();
+
+    // Delete state
+    private Finance? entryToDelete = null;
+
+    protected override void OnInitialized()
+    {
+        LoadLedger();
+    }
+
+    private void LoadLedger()
+    {
+        ledger = Db.Finances.OrderByDescending(f => f.RecordedDate).ThenByDescending(f => f.Id).ToList();
+        
+        // Sum calculations
+        totalIncome = ledger.Where(f => f.Type == FinanceType.Income).Sum(f => f.Amount);
+        totalExpense = ledger.Where(f => f.Type == FinanceType.Expense).Sum(f => f.Amount);
+        
+        FilterLedger();
+    }
+
+    private void FilterLedger()
+    {
+        if (string.IsNullOrWhiteSpace(searchQuery))
+        {
+            filteredLedger = ledger;
+        }
+        else
+        {
+            var q = searchQuery.ToLower();
+            filteredLedger = ledger
+                .Where(f => f.Description.ToLower().Contains(q) || (f.ReferenceNo != null && f.ReferenceNo.ToLower().Contains(q)))
+                .ToList();
+        }
+
+        if (!string.IsNullOrEmpty(filterType))
+        {
+            var typeEnum = (FinanceType)Enum.Parse(typeof(FinanceType), filterType);
+            filteredLedger = filteredLedger.Where(f => f.Type == typeEnum).ToList();
+        }
+    }
+
+    private void ClearSearch()
+    {
+        searchQuery = string.Empty;
+        filterType = string.Empty;
+        FilterLedger();
+    }
+
+    private void OpenAddModal()
+    {
+        editingEntry = new Finance
+        {
+            RecordedDate = DateTime.Now,
+            Type = FinanceType.Income
+        };
+        isModalOpen = true;
+    }
+
+    private void OpenEditModal(Finance entry)
+    {
+        editingEntry = new Finance
+        {
+            Id = entry.Id,
+            Type = entry.Type,
+            Amount = entry.Amount,
+            Description = entry.Description,
+            RecordedDate = entry.RecordedDate,
+            ReferenceNo = entry.ReferenceNo,
+            QuotationId = entry.QuotationId
+        };
+        isModalOpen = true;
+    }
+
+    private void CloseModal()
+    {
+        isModalOpen = false;
+    }
+
+    private void SaveFinance()
+    {
+        if (editingEntry.Id == 0)
+        {
+            Db.Finances.Add(editingEntry);
+        }
+        else
+        {
+            var existing = Db.Finances.Find(editingEntry.Id);
+            if (existing != null)
+            {
+                existing.Type = editingEntry.Type;
+                existing.Amount = editingEntry.Amount;
+                existing.Description = editingEntry.Description;
+                existing.RecordedDate = editingEntry.RecordedDate;
+                existing.ReferenceNo = editingEntry.ReferenceNo;
+                Db.Finances.Update(existing);
+            }
+        }
+        Db.SaveChanges();
+        isModalOpen = false;
+        LoadLedger();
+    }
+
+    private void ConfirmDelete(Finance entry)
+    {
+        entryToDelete = entry;
+    }
+
+    private void CancelDelete()
+    {
+        entryToDelete = null;
+    }
+
+    private void DeleteFinance()
+    {
+        if (entryToDelete != null)
+        {
+            Db.Finances.Remove(entryToDelete);
+            Db.SaveChanges();
+            entryToDelete = null;
+            LoadLedger();
+        }
+    }
+}

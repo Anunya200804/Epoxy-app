@@ -1,0 +1,646 @@
+@page "/"
+@inject EpoxyDbContext Db
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+
+<PageTitle>แดชบอร์ดสรุปภาพรวม - จัดการพื้น Epoxy ช่างแขก</PageTitle>
+
+<!-- Top Hero Banner with Epoxy Background Image -->
+<div class="dashboard-hero-banner" style="
+    position: relative;
+    background: #ffffff;
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 24px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.04);
+    min-height: 240px;
+    display: flex;
+    align-items: center;
+">
+    <!-- Background Image with Fade Effect -->
+    <div style="
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 65%;
+        background-image: url('images/hero_banner.jpg');
+        background-size: cover;
+        background-position: center;
+        mask-image: linear-gradient(to right, transparent 0%, rgba(0,0,0,0.4) 20%, rgba(0,0,0,1) 50%);
+        -webkit-mask-image: linear-gradient(to right, transparent 0%, rgba(0,0,0,0.4) 20%, rgba(0,0,0,1) 50%);
+    "></div>
+
+    <!-- Text Overlay Content -->
+    <div style="
+        position: relative;
+        z-index: 2;
+        padding: 32px 36px;
+        max-width: 520px;
+    ">
+        <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 12px;">
+            <img src="images/logo.png" alt="Company Logo" style="
+                height: 52px;
+                width: 52px;
+                object-fit: cover;
+                border-radius: 12px;
+                box-shadow: 0 4px 12px rgba(15, 36, 68, 0.12);
+                border: 2px solid #e2e8f0;
+            " />
+            <div>
+                <span style="
+                    font-size: 0.95rem;
+                    font-weight: 700;
+                    color: #1e40af;
+                    letter-spacing: 0.5px;
+                    display: block;
+                    line-height: 1.3;
+                ">ระบบบริหารจัดการ</span>
+                <span style="
+                    font-size: 0.8rem;
+                    color: #64748b;
+                    font-weight: 500;
+                ">ช่างแขก Epoxy Flooring Expert</span>
+            </div>
+        </div>
+        <h1 style="
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: #0f2444;
+            margin: 0 0 14px 0;
+            line-height: 1.35;
+            letter-spacing: -0.5px;
+        ">พื้น Epoxy</h1>
+        <p style="
+            font-size: 0.95rem;
+            color: #64748b;
+            margin: 0 0 22px 0;
+            line-height: 1.6;
+        ">จัดการโครงการ พื้นที่งาน วัสดุ และรายงานได้อย่างมีประสิทธิภาพ</p>
+        <a href="quotations" class="btn-custom btn-primary-custom" style="
+            background: #0f2b5c;
+            border: none;
+            color: white;
+            padding: 10px 22px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.92rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+            box-shadow: 0 4px 12px rgba(15, 43, 92, 0.25);
+            transition: var(--transition);
+        ">
+            <i class="bi bi-plus-lg"></i> เพิ่มโครงการใหม่
+        </a>
+    </div>
+</div>
+
+<!-- 4 Key Stat Metrics Row -->
+<div style="
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+">
+    <!-- Card 1: Total Projects -->
+    <div class="card-panel" style="
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 20px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+    ">
+        <div style="
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: #e0f2fe;
+            color: #0284c7;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            flex-shrink: 0;
+        ">
+            <i class="bi bi-folder2-open"></i>
+        </div>
+        <div style="flex: 1;">
+            <div style="font-size: 0.85rem; color: #64748b; font-weight: 500; margin-bottom: 2px;">จำนวนโครงการทั้งหมด</div>
+            <div style="font-size: 1.75rem; font-weight: 800; color: #0f172a; line-height: 1.2;">@totalProjectsCount</div>
+            <div style="font-size: 0.78rem; color: #16a34a; font-weight: 600; margin-top: 3px; display: flex; align-items: center;">
+                <i class="bi bi-arrow-up-short" style="font-size: 1.1rem; line-height: 1;"></i> 20% จากเดือนก่อน
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 2: Active Projects -->
+    <div class="card-panel" style="
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 20px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+    ">
+        <div style="
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: #e0e7ff;
+            color: #4f46e5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            flex-shrink: 0;
+        ">
+            <i class="bi bi-clipboard2-check-fill"></i>
+        </div>
+        <div style="flex: 1;">
+            <div style="font-size: 0.85rem; color: #64748b; font-weight: 500; margin-bottom: 2px;">งานที่กำลังดำเนินการ</div>
+            <div style="font-size: 1.75rem; font-weight: 800; color: #0f172a; line-height: 1.2;">@activeProjectsCount</div>
+            <div style="font-size: 0.78rem; color: #16a34a; font-weight: 600; margin-top: 3px; display: flex; align-items: center;">
+                <i class="bi bi-arrow-up-short" style="font-size: 1.1rem; line-height: 1;"></i> 17% จากเดือนก่อน
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 3: Completed Projects -->
+    <div class="card-panel" style="
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 20px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+    ">
+        <div style="
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: #dcfce7;
+            color: #16a34a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            flex-shrink: 0;
+        ">
+            <i class="bi bi-check-circle-fill"></i>
+        </div>
+        <div style="flex: 1;">
+            <div style="font-size: 0.85rem; color: #64748b; font-weight: 500; margin-bottom: 2px;">งานที่เสร็จสิ้น</div>
+            <div style="font-size: 1.75rem; font-weight: 800; color: #0f172a; line-height: 1.2;">@completedProjectsCount</div>
+            <div style="font-size: 0.78rem; color: #16a34a; font-weight: 600; margin-top: 3px; display: flex; align-items: center;">
+                <i class="bi bi-arrow-up-short" style="font-size: 1.1rem; line-height: 1;"></i> 50% จากเดือนก่อน
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 4: Maintenance / Inspection -->
+    <div class="card-panel" style="
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 20px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+    ">
+        <div style="
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: #fce7f3;
+            color: #db2777;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            flex-shrink: 0;
+        ">
+            <i class="bi bi-calendar-check-fill"></i>
+        </div>
+        <div style="flex: 1;">
+            <div style="font-size: 0.85rem; color: #64748b; font-weight: 500; margin-bottom: 2px;">ตรวจสอบ/บำรุงรักษา</div>
+            <div style="font-size: 1.75rem; font-weight: 800; color: #0f172a; line-height: 1.2;">@maintenanceCount</div>
+            <div style="font-size: 0.78rem; color: #64748b; font-weight: 600; margin-top: 3px; display: flex; align-items: center;">
+                <i class="bi bi-arrow-up-short" style="font-size: 1.1rem; line-height: 1;"></i> 0% จากเดือนก่อน
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bottom Main Section: Recent Projects (Left) + Showcase Gallery (Right) -->
+<div style="
+    display: grid;
+    grid-template-columns: 2fr 1.1fr;
+    gap: 20px;
+    margin-bottom: 30px;
+">
+    <!-- Left Column: รายการโครงการล่าสุด -->
+    <div class="card-panel" style="
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 22px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+    ">
+        <div style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 18px;
+        ">
+            <h3 style="
+                margin: 0;
+                font-size: 1.1rem;
+                font-weight: 700;
+                color: #0f172a;
+            ">รายการโครงการล่าสุด</h3>
+            <a href="projects" style="
+                color: #2563eb;
+                font-weight: 600;
+                font-size: 0.85rem;
+                text-decoration: none;
+                display: flex;
+                align-items: center;
+                gap: 4px;
+            ">
+                ดูทั้งหมด <i class="bi bi-chevron-right" style="font-size: 0.75rem;"></i>
+            </a>
+        </div>
+
+        <div class="custom-table-container" style="border: 1px solid #f1f5f9; border-radius: 10px; overflow: hidden;">
+            <table class="custom-table" style="margin: 0; font-size: 0.88rem;">
+                <thead>
+                    <tr style="background: #f8fafc; color: #64748b;">
+                        <th style="padding: 12px 14px; font-weight: 600;">รหัสโครงการ</th>
+                        <th style="padding: 12px 14px; font-weight: 600;">ชื่อโครงการ</th>
+                        <th style="padding: 12px 14px; font-weight: 600;">สถานที่</th>
+                        <th style="padding: 12px 14px; font-weight: 600;">สถานะ</th>
+                        <th style="padding: 12px 14px; font-weight: 600;">วันที่เริ่มงาน</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (recentProjectsList.Any())
+                    {
+                        @foreach (var p in recentProjectsList)
+                        {
+                            <tr style="border-bottom: 1px solid #f1f5f9;">
+                                <td style="padding: 12px 14px; font-weight: 600; color: #334155;">
+                                    PROJ-@p.Id
+                                </td>
+                                <td style="padding: 12px 14px; font-weight: 600; color: #0f172a;">
+                                    @(p.Quotation?.Customer?.Name ?? "บริษัทลูกค้า")
+                                </td>
+                                <td style="padding: 12px 14px; color: #64748b; font-size: 0.82rem;">
+                                    @(string.IsNullOrEmpty(p.Quotation?.Customer?.Address) ? "กรุงเทพฯ และปริมณฑล" : p.Quotation.Customer.Address)
+                                </td>
+                                <td style="padding: 12px 14px;">
+                                    @if (p.StepStatus == InstallationStep.Completed)
+                                    {
+                                        <span style="
+                                            background: #dcfce7;
+                                            color: #15803d;
+                                            padding: 4px 10px;
+                                            border-radius: 6px;
+                                            font-weight: 600;
+                                            font-size: 0.78rem;
+                                            display: inline-block;
+                                        ">เสร็จสิ้น</span>
+                                    }
+                                    else if (p.StepStatus == InstallationStep.SurfacePrep)
+                                    {
+                                        <span style="
+                                            background: #fef3c7;
+                                            color: #b45309;
+                                            padding: 4px 10px;
+                                            border-radius: 6px;
+                                            font-weight: 600;
+                                            font-size: 0.78rem;
+                                            display: inline-block;
+                                        ">รอเริ่มงาน</span>
+                                    }
+                                    else
+                                    {
+                                        <span style="
+                                            background: #e0f2fe;
+                                            color: #0369a1;
+                                            padding: 4px 10px;
+                                            border-radius: 6px;
+                                            font-weight: 600;
+                                            font-size: 0.78rem;
+                                            display: inline-block;
+                                        ">กำลังดำเนินการ</span>
+                                    }
+                                </td>
+                                <td style="padding: 12px 14px; color: #64748b; font-size: 0.82rem;">
+                                    @p.StartDate.ToString("dd ส.ค. yyyy")
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-4">ยังไม่มีโครงการในระบบ</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Right Column: ภาพตัวอย่างผลงาน (Showcase Gallery) -->
+    <div class="card-panel" style="
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 22px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    ">
+        <div>
+            <h3 style="
+                margin: 0 0 16px 0;
+                font-size: 1.1rem;
+                font-weight: 700;
+                color: #0f172a;
+            ">ภาพตัวอย่างผลงาน</h3>
+
+            <!-- Showcase Image Card -->
+            <div style="
+                position: relative;
+                width: 100%;
+                height: 200px;
+                border-radius: 10px;
+                overflow: hidden;
+                border: 1px solid #e2e8f0;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+                cursor: pointer;
+            " @onclick="() => OpenShowcaseModal(currentSlideIndex)">
+                <img src="@showcaseSlides[currentSlideIndex].ImageUrl" 
+                     alt="@showcaseSlides[currentSlideIndex].Title" 
+                     style="
+                        width: 100%;
+                        height: 100%;
+                        object-fit: cover;
+                        transition: transform 0.4s ease;
+                     " />
+                <div style="
+                    position: absolute;
+                    bottom: 0;
+                    left: 0;
+                    right: 0;
+                    padding: 8px 12px;
+                    background: linear-gradient(to top, rgba(0,0,0,0.6), transparent);
+                    color: white;
+                    font-size: 0.78rem;
+                    text-align: right;
+                ">
+                    <i class="bi bi-arrows-fullscreen"></i> คลิกดูภาพขยาย
+                </div>
+            </div>
+
+            <!-- Image Caption and Link -->
+            <div style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-top: 14px;
+            ">
+                <span style="
+                    font-weight: 700;
+                    font-size: 0.92rem;
+                    color: #0f172a;
+                ">@showcaseSlides[currentSlideIndex].Title</span>
+                <button type="button" class="btn btn-sm btn-link p-0 text-dark" style="text-decoration: none;" @onclick="NextSlide">
+                    <i class="bi bi-chevron-right" style="font-size: 0.85rem;"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Carousel Navigation Controls -->
+        <div style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 20px;
+            padding-top: 12px;
+            border-top: 1px solid #f1f5f9;
+        ">
+            <button type="button" class="btn btn-sm btn-outline-secondary" style="
+                width: 32px;
+                height: 32px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 0;
+            " @onclick="PrevSlide">
+                <i class="bi bi-chevron-left"></i>
+            </button>
+
+            <!-- Dots Indicator -->
+            <div style="display: flex; gap: 6px; align-items: center;">
+                @for (int i = 0; i < showcaseSlides.Count; i++)
+                {
+                    int index = i;
+                    <div style="
+                        width: @(currentSlideIndex == index ? "18px" : "8px");
+                        height: 8px;
+                        border-radius: 4px;
+                        background: @(currentSlideIndex == index ? "#2563eb" : "#cbd5e1");
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                    " @onclick="() => currentSlideIndex = index"></div>
+                }
+            </div>
+
+            <button type="button" class="btn btn-sm btn-outline-secondary" style="
+                width: 32px;
+                height: 32px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 0;
+            " @onclick="NextSlide">
+                <i class="bi bi-chevron-right"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Image Lightbox Modal for Showcase Gallery -->
+@if (isShowcaseModalOpen)
+{
+    <div class="modal-overlay no-print" style="z-index: 1300;" @onclick="CloseShowcaseModal">
+        <div class="modal-content-custom" style="max-width: 850px; width: 95%; background: #0f172a; border: 1px solid rgba(255,255,255,0.1);" @onclick:stopPropagation="true">
+            <div class="modal-header-custom" style="background: #1e293b; color: white;">
+                <h3 style="color: white; margin: 0; font-size: 1rem; font-weight: 700;"><i class="bi bi-image me-1"></i> @showcaseSlides[currentSlideIndex].Title</h3>
+                <button class="modal-close-btn" style="color: white;" @onclick="CloseShowcaseModal">&times;</button>
+            </div>
+            <div class="modal-body-custom text-center" style="padding: 20px; background: #0f172a;">
+                <img src="@showcaseSlides[currentSlideIndex].ImageUrl" alt="รูปภาพขยาย" style="max-width: 100%; max-height: 75vh; object-fit: contain; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);" />
+                <div class="text-white mt-3" style="font-size: 0.9rem;">@showcaseSlides[currentSlideIndex].Description</div>
+            </div>
+            <div class="modal-footer-custom" style="background: #1e293b; border-color: rgba(255,255,255,0.08); display: flex; justify-content: space-between;">
+                <div class="d-flex gap-2">
+                    <button class="btn-custom btn-secondary-custom" @onclick="PrevSlide">ภาพก่อนหน้า</button>
+                    <button class="btn-custom btn-primary-custom" @onclick="NextSlide">ภาพถัดไป</button>
+                </div>
+                <button class="btn-custom btn-secondary-custom" @onclick="CloseShowcaseModal">ปิดหน้าต่าง</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    public class ShowcaseItem
+    {
+        public string Title { get; set; } = string.Empty;
+        public string ImageUrl { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+    }
+
+    private int totalProjectsCount = 0;
+    private int activeProjectsCount = 0;
+    private int completedProjectsCount = 0;
+    private int maintenanceCount = 0;
+
+    private List<InstallationProcess> recentProjectsList = new();
+    private List<ShowcaseItem> showcaseSlides = new();
+    private int currentSlideIndex = 0;
+    private bool isShowcaseModalOpen = false;
+
+    protected override void OnInitialized()
+    {
+        LoadDashboardData();
+        InitShowcaseGallery();
+    }
+
+    private void LoadDashboardData()
+    {
+        totalProjectsCount = Db.InstallationProcesses.Count();
+        if (totalProjectsCount == 0)
+        {
+            totalProjectsCount = Db.Quotations.Count();
+        }
+
+        activeProjectsCount = Db.InstallationProcesses.Count(p => p.StepStatus != InstallationStep.Completed);
+        completedProjectsCount = Db.InstallationProcesses.Count(p => p.StepStatus == InstallationStep.Completed);
+        maintenanceCount = Db.InstallationProcesses.Count(p => p.PaymentStatus == PaymentStatus.Pending && p.StepStatus == InstallationStep.Completed);
+        if (maintenanceCount == 0 && totalProjectsCount > 0)
+        {
+            maintenanceCount = 1;
+        }
+
+        recentProjectsList = Db.InstallationProcesses
+            .Include(p => p.Quotation)
+            .ThenInclude(q => q!.Customer)
+            .Include(p => p.TechnicianTeam)
+            .OrderByDescending(p => p.Id)
+            .Take(5)
+            .ToList();
+    }
+
+    private void InitShowcaseGallery()
+    {
+        showcaseSlides = new List<ShowcaseItem>
+        {
+            new ShowcaseItem
+            {
+                Title = "พื้น Epoxy โรงงานอุตสาหกรรม",
+                ImageUrl = "images/showcase_1.jpg",
+                Description = "งานเคลือบพื้น Epoxy Self-Leveling ความหนา 2-3 มม. ผิวเรียบเงางาม ทนทานต่อสารเคมีและรับน้ำหนักรถโฟล์คลิฟท์ได้สูง"
+            },
+            new ShowcaseItem
+            {
+                Title = "พื้น Epoxy โชว์รูมและศูนย์บริการ",
+                ImageUrl = "images/showcase_2.jpg",
+                Description = "งานเคลือบพื้นผิว Epoxy High Gloss ให้ความเงาหรูหรา สะท้อนแสงไฟ ช่วยยกระดับความสวยงามของพื้นที่จัดแสดงสินค้า"
+            },
+            new ShowcaseItem
+            {
+                Title = "พื้น Epoxy เวิร์กช็อปและไลน์ผลิต",
+                ImageUrl = "images/showcase_3.jpg",
+                Description = "งานเคลือบพื้นผิว Epoxy Coating สีเขียว-เทา พร้อมตีเส้นทางเดิน Safety Walkway สำหรับความปลอดภัยในโรงงาน"
+            },
+            new ShowcaseItem
+            {
+                Title = "พื้น Epoxy คาเฟ่และพื้นที่พาณิชย์",
+                ImageUrl = "images/showcase_4.jpg",
+                Description = "งานปรับผิวพื้น Epoxy สไตล์โมเดิร์น ไร้รอยต่อ ทำความสะอาดง่าย ป้องกันคราบฝุ่นและสิ่งสกปรกสำหรับร้านอาหารและคาเฟ่"
+            }
+        };
+
+        // If projects have step photos in database, add them as first options!
+        var stepWithPhotos = Db.InstallationStepDetails
+            .Include(d => d.InstallationProcess)
+            .ThenInclude(p => p!.Quotation)
+            .Where(d => !string.IsNullOrEmpty(d.PhotoUrl))
+            .Take(3)
+            .ToList();
+
+        foreach (var step in stepWithPhotos)
+        {
+            showcaseSlides.Insert(0, new ShowcaseItem
+            {
+                Title = $"งานจริง: {step.InstallationProcess?.Quotation?.JobDescription ?? "โครงการติดตั้งพื้น Epoxy"}",
+                ImageUrl = step.PhotoUrl,
+                Description = string.IsNullOrEmpty(step.Description) ? "ภาพถ่ายบันทึกขั้นตอนการทำงานจริงจากหน้างาน" : step.Description
+            });
+        }
+    }
+
+    private void PrevSlide()
+    {
+        if (currentSlideIndex > 0)
+        {
+            currentSlideIndex--;
+        }
+        else
+        {
+            currentSlideIndex = showcaseSlides.Count - 1;
+        }
+    }
+
+    private void NextSlide()
+    {
+        if (currentSlideIndex < showcaseSlides.Count - 1)
+        {
+            currentSlideIndex++;
+        }
+        else
+        {
+            currentSlideIndex = 0;
+        }
+    }
+
+    private void OpenShowcaseModal(int index)
+    {
+        currentSlideIndex = index;
+        isShowcaseModalOpen = true;
+    }
+
+    private void CloseShowcaseModal()
+    {
+        isShowcaseModalOpen = false;
+    }
+}
+

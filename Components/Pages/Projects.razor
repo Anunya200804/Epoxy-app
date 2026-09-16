@@ -1,0 +1,1387 @@
+@page "/projects"
+@inject EpoxyDbContext Db
+@inject AuthService AuthService
+@inject IJSRuntime JS
+
+<PageTitle>ติดตามงานติดตั้ง - ระบบการจัดการพื้น Epoxy</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4 no-print flex-wrap gap-2">
+    <div>
+        <h2 class="mb-1" style="font-weight: 700; color: var(--primary);">กระบวนการติดตั้งและติดตามชำระเงิน</h2>
+        <p class="text-muted mb-0">ติดตามความคืบหน้าหน้างาน กำหนดชำระงวดสุดท้ายภายใน 7 วัน และคำนวณค่าปรับชำระล่าช้า 3%/วัน แบบเรียลไทม์</p>
+    </div>
+</div>
+
+<!-- KPI Summary Cards -->
+<div class="row g-3 mb-4 no-print" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px;">
+    <!-- 1. Total Projects -->
+    <div style="background: white; border-radius: 12px; padding: 18px; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.04); display: flex; align-items: center; gap: 14px;">
+        <div style="width: 48px; height: 48px; border-radius: 10px; background: rgba(59,130,246,0.1); color: #2563eb; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
+            <i class="bi bi-kanban"></i>
+        </div>
+        <div>
+            <div style="font-size: 0.82rem; color: #64748b; font-weight: 600;">โครงการทั้งหมด</div>
+            <div style="font-size: 1.4rem; font-weight: 800; color: #0f172a;">@projects.Count โครงการ</div>
+        </div>
+    </div>
+
+    <!-- 2. In Progress -->
+    <div style="background: white; border-radius: 12px; padding: 18px; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.04); display: flex; align-items: center; gap: 14px;">
+        <div style="width: 48px; height: 48px; border-radius: 10px; background: rgba(245,158,11,0.1); color: #d97706; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
+            <i class="bi bi-hourglass-split"></i>
+        </div>
+        <div>
+            <div style="font-size: 0.82rem; color: #64748b; font-weight: 600;">กำลังดำเนินการ</div>
+            <div style="font-size: 1.4rem; font-weight: 800; color: #d97706;">@projects.Count(p => p.StepStatus != InstallationStep.Completed) งาน</div>
+        </div>
+    </div>
+
+    <!-- 3. Completed & Paid -->
+    <div style="background: white; border-radius: 12px; padding: 18px; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.04); display: flex; align-items: center; gap: 14px;">
+        <div style="width: 48px; height: 48px; border-radius: 10px; background: rgba(16,185,129,0.1); color: #059669; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
+            <i class="bi bi-check2-circle"></i>
+        </div>
+        <div>
+            <div style="font-size: 0.82rem; color: #64748b; font-weight: 600;">ชำระเงินครบถ้วน</div>
+            <div style="font-size: 1.4rem; font-weight: 800; color: #059669;">@projects.Count(p => p.PaymentStatus == PaymentStatus.Paid) งาน</div>
+        </div>
+    </div>
+
+    <!-- 4. Overdue with 3% Penalty -->
+    @{
+        var overdueProjects = projects.Where(p => p.PaymentStatus == PaymentStatus.Pending && p.OverdueDays > 0).ToList();
+        var totalPenalty = overdueProjects.Sum(p => p.LatePenaltyAmount);
+    }
+    <div style="background: @(overdueProjects.Any() ? "#fff1f2" : "white"); border-radius: 12px; padding: 18px; border: 1px solid @(overdueProjects.Any() ? "#fecdd3" : "#e2e8f0"); box-shadow: 0 2px 8px rgba(0,0,0,0.04); display: flex; align-items: center; gap: 14px;">
+        <div style="width: 48px; height: 48px; border-radius: 10px; background: rgba(239,68,68,0.12); color: #dc2626; display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
+            <i class="bi bi-exclamation-octagon-fill"></i>
+        </div>
+        <div>
+            <div style="font-size: 0.82rem; color: #991b1b; font-weight: 600;">เกินกำหนดชำระ 7 วัน</div>
+            <div style="font-size: 1.4rem; font-weight: 800; color: #dc2626;">
+                @overdueProjects.Count งาน
+                @if (totalPenalty > 0)
+                {
+                    <span style="font-size: 0.75rem; font-weight: 600; color: #b91c1c; display: block;">(+ค่าปรับรวม ฿@totalPenalty.ToString("N0"))</span>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Project List -->
+<div class="card-panel no-print">
+    <div class="custom-table-container">
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>เลขที่โครงการ</th>
+                    <th>ลูกค้า</th>
+                    <th>ทีมช่างผู้รับผิดชอบ</th>
+                    <th>ขั้นตอนการทำงาน</th>
+                    <th>วันที่ดำเนินงาน</th>
+                    <th>กำหนดชำระเงินงวดสุดท้าย</th>
+                    <th>ยอดเรียกเก็บงวดสุดท้าย</th>
+                    <th class="text-center">จัดการ</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (projects.Any())
+                {
+                    @foreach (var p in projects)
+                    {
+                        <tr>
+                            <td><strong>PROJ-@p.Id (QT-@p.QuotationId)</strong></td>
+                            <td>
+                                <strong>@p.Quotation?.Customer?.Name</strong><br />
+                                <span style="font-size: 0.8rem; color: #aaa;">@p.Quotation?.JobDescription</span>
+                            </td>
+                            <td>
+                                @if (p.TechnicianTeam != null)
+                                {
+                                    <span>@p.TechnicianTeam.TeamName (หัวหน้า: @p.TechnicianTeam.LeaderName)</span>
+                                }
+                                else
+                                {
+                                    <span class="text-danger"><i class="bi bi-exclamation-triangle"></i> ยังไม่ได้ระบุทีม</span>
+                                }
+                            </td>
+                            <td>
+                                <span class="badge-status badge-@GetStepBadgeClass(p.StepStatus)">
+                                    @GetStepName(p.StepStatus)
+                                </span>
+                            </td>
+                            <td>
+                                <div style="font-size: 0.82rem;">
+                                    <div><strong>เริ่ม:</strong> @p.StartDate.ToString("dd/MM/yyyy")</div>
+                                    @if (p.EndDate.HasValue)
+                                    {
+                                        <div style="color: #16a34a;"><strong>เสร็จ:</strong> @p.EndDate.Value.ToString("dd/MM/yyyy")</div>
+                                    }
+                                </div>
+                            </td>
+                            <td>
+                                @if (p.PaymentStatus == PaymentStatus.Paid)
+                                {
+                                    <div style="font-size: 0.82rem;">
+                                        <span class="badge bg-success" style="padding: 4px 8px; font-weight: 600;">
+                                            <i class="bi bi-check-circle-fill me-1"></i> ชำระครบแล้ว
+                                        </span>
+                                        @if (p.PaymentDate.HasValue)
+                                        {
+                                            <div class="text-muted" style="font-size: 0.75rem; margin-top: 2px;">
+                                                เมื่อ @p.PaymentDate.Value.ToString("dd/MM/yyyy")
+                                            </div>
+                                        }
+                                        @if (p.OverdueDays > 0)
+                                        {
+                                            <div style="color: #ea580c; font-size: 0.72rem;">(จ่ายล่าช้า @p.OverdueDays วัน)</div>
+                                        }
+                                    </div>
+                                }
+                                else if (p.EndDate.HasValue)
+                                {
+                                    @if (p.OverdueDays <= 0)
+                                    {
+                                        <div>
+                                            <span class="badge" style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; font-size: 0.8rem; padding: 4px 8px;">
+                                                <i class="bi bi-clock-history me-1"></i> ภายใน @p.DueDate?.ToString("dd/MM/yyyy")
+                                            </span>
+                                            <div style="font-size: 0.75rem; color: #0284c7; margin-top: 3px;">
+                                                (เหลือเวลาอีก @p.DaysRemaining วัน)
+                                            </div>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div>
+                                            <span class="badge" style="background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; font-size: 0.8rem; padding: 4px 8px;">
+                                                <i class="bi bi-exclamation-triangle-fill me-1"></i> เกินกำหนด @p.OverdueDays วัน
+                                            </span>
+                                            <div style="font-size: 0.75rem; color: #dc2626; font-weight: 600; margin-top: 3px;">
+                                                ปรับ 3%/วัน: +฿@p.LatePenaltyAmount.ToString("N0")
+                                            </div>
+                                        </div>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="text-muted" style="font-size: 0.82rem;">
+                                        <i class="bi bi-hourglass"></i> รอส่งมอบงาน
+                                    </span>
+                                }
+                            </td>
+                            <td>
+                                @if (p.PaymentStatus == PaymentStatus.Paid)
+                                {
+                                    <span class="badge-status badge-paid">
+                                        ฿@p.Quotation?.BalanceAmount.ToString("N0")
+                                    </span>
+                                }
+                                else if (p.OverdueDays > 0)
+                                {
+                                    <div>
+                                        <div style="font-size: 1.05rem; font-weight: 800; color: #dc2626;">
+                                            ฿@p.TotalPayableAmount.ToString("N0")
+                                        </div>
+                                        <div style="font-size: 0.72rem; color: #991b1b;">
+                                            (เงินต้น ฿@p.Quotation?.BalanceAmount.ToString("N0") + ปรับ ฿@p.LatePenaltyAmount.ToString("N0"))
+                                        </div>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <span class="badge-status badge-pending" style="font-size: 0.92rem; font-weight: 700;">
+                                        ฿@p.Quotation?.BalanceAmount.ToString("N0")
+                                    </span>
+                                }
+                            </td>
+                            <td class="text-center">
+                                <div class="d-flex justify-content-center gap-1">
+                                    <button class="btn btn-sm btn-outline-info" title="ดูรายละเอียดกระบวนการทั้งหมด" @onclick="() => OpenDetailsModal(p)">
+                                        <i class="bi bi-eye-fill"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-primary" title="อัปเดตความคืบหน้า/บันทึกงานขั้นตอนต่างๆ" @onclick="() => OpenUpdateModal(p)">
+                                        <i class="bi bi-gear-fill"></i>
+                                    </button>
+                                    @if (p.PaymentStatus == PaymentStatus.Paid)
+                                    {
+                                        <button class="btn btn-sm btn-outline-success" title="พิมพ์ใบเสร็จรับเงิน" @onclick="() => OpenReceiptPreview(p)">
+                                            <i class="bi bi-file-earmark-check-fill"></i> ใบเสร็จ
+                                        </button>
+                                        @if (!string.IsNullOrEmpty(p.FinalPaymentSlipUrl))
+                                        {
+                                            <button class="btn btn-sm btn-outline-primary" title="ดูรูปภาพสลิปโอนเงินงวดสุดท้าย" @onclick="@(() => OpenImageLightbox(p.FinalPaymentSlipUrl, $"สลิปการโอนเงินงวดสุดท้าย PROJ-{p.Id}"))">
+                                                <i class="bi bi-image"></i> สลิป
+                                            </button>
+                                        }
+                                    }
+                                    else if (p.StepStatus == InstallationStep.Completed && (AuthService.CurrentUser?.Role == UserRole.Admin || AuthService.CurrentUser?.Role == UserRole.ProjectManager))
+                                    {
+                                        <button class="btn btn-sm btn-success" title="ยืนยันการรับชำระเงินและแนบสลิปเพื่อเปิดสิทธิ์ใบเสร็จ" @onclick="() => OpenPaymentConfirmModal(p)">
+                                            <i class="bi bi-cash"></i> รับเงินงวดท้าย
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn btn-sm btn-outline-secondary" disabled title="ยังไม่ชำระเงินงวดสุดท้าย (ออกใบเสร็จไม่ได้)">
+                                            <i class="bi bi-lock-fill"></i> ใบเสร็จ
+                                        </button>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-4">ยังไม่มีโครงการติดตั้งที่อนุมัติเข้ามา</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal for Update Progress & Assign Team & Step Details -->
+@if (isUpdateModalOpen && selectedProject != null)
+{
+    <div class="modal-overlay no-print">
+        <div class="modal-content-custom" style="max-width: 950px; width: 95%;">
+            <div class="modal-header-custom">
+                <h3>อัปเดตความคืบหน้าโครงการ PROJ-@selectedProject.Id</h3>
+                <button class="modal-close-btn" @onclick="CloseUpdateModal">&times;</button>
+            </div>
+            <div>
+                <div class="modal-body-custom" style="max-height: 70vh; overflow-y: auto;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 24px;">
+                        
+                        <!-- Left Column: General Settings -->
+                        <div>
+                            <h4 style="border-bottom: 2px solid rgba(255,255,255,0.06); padding-bottom: 8px; margin-bottom: 16px; color: var(--primary);">
+                                <i class="bi bi-info-circle" style="margin-right: 6px;"></i> ข้อมูลทั่วไปของโครงการ
+                            </h4>
+                            
+                            <!-- Tech Team Assignment -->
+                            <div class="form-group">
+                                <label class="form-label" for="proj-team">มอบหมายทีมช่างผู้รับผิดชอบ *</label>
+                                <select id="proj-team" class="form-control-custom" @bind="selectedProject.TechnicianTeamId" required>
+                                    <option value="">-- กรุณาเลือกทีมช่าง --</option>
+                                    @foreach (var team in teams)
+                                    {
+                                        <option value="@team.Id">@team.TeamName (หัวหน้า: @team.LeaderName)</option>
+                                    }
+                                </select>
+                            </div>
+
+                            <!-- Step Tracker Indicator (Interactive) -->
+                            <div class="form-group">
+                                <label class="form-label">ขั้นตอนความคืบหน้างานติดตั้งปัจจุบัน *</label>
+                                <div class="installation-stepper" style="margin-bottom: 30px;">
+                                    <div class="stepper-progress-line">
+                                        <div class="stepper-progress-line-fill" style="width: @(GetStepperProgressWidth(selectedProject.StepStatus))%"></div>
+                                    </div>
+                                    
+                                    <div class="step-node @(GetStepNodeClass(selectedProject.StepStatus, InstallationStep.SurfacePrep))" @onclick="() => SetStep(InstallationStep.SurfacePrep)">
+                                        1
+                                        <span class="step-label">เตรียมพื้นผิว</span>
+                                    </div>
+                                    <div class="step-node @(GetStepNodeClass(selectedProject.StepStatus, InstallationStep.Priming))" @onclick="() => SetStep(InstallationStep.Priming)">
+                                        2
+                                        <span class="step-label">ทาสีรองพื้น</span>
+                                    </div>
+                                    <div class="step-node @(GetStepNodeClass(selectedProject.StepStatus, InstallationStep.EpoxyApplying))" @onclick="() => SetStep(InstallationStep.EpoxyApplying)">
+                                        3
+                                        <span class="step-label">เคลือบ Epoxy</span>
+                                    </div>
+                                    <div class="step-node @(GetStepNodeClass(selectedProject.StepStatus, InstallationStep.Completed))" @onclick="() => SetStep(InstallationStep.Completed)">
+                                        4
+                                        <span class="step-label">ส่งมอบงาน</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Date info -->
+                            <div style="display: flex; gap: 12px; margin-top: 40px;">
+                                <div class="form-group" style="flex: 1;">
+                                    <label class="form-label">วันที่เริ่มติดตั้ง</label>
+                                    <input type="date" class="form-control-custom" @bind="selectedProject.StartDate" />
+                                </div>
+                                <div class="form-group" style="flex: 1;">
+                                    <label class="form-label">วันที่แล้วเสร็จ</label>
+                                    <input type="date" class="form-control-custom" @bind="selectedProject.EndDate" disabled="@(selectedProject.StepStatus != InstallationStep.Completed)" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right Column: Step Details Editor -->
+                        <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 20px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid rgba(255,255,255,0.06); padding-bottom: 8px; margin-bottom: 16px;">
+                                <h4 style="margin: 0; color: var(--teal); font-weight: 600;">
+                                    <i class="bi bi-pencil-square" style="margin-right: 6px;"></i> บันทึกขั้นตอน: @GetStepLabelOnly(selectedStepperStep)
+                                </h4>
+                                <select class="form-control-custom" style="width: auto; padding: 4px 8px; font-size: 0.85rem;" 
+                                        value="@selectedStepperStep" @onchange="OnSelectedStepperStepChanged">
+                                    <option value="@InstallationStep.SurfacePrep">1. เตรียมพื้นผิว</option>
+                                    <option value="@InstallationStep.Priming">2. ทาสีรองพื้น</option>
+                                    <option value="@InstallationStep.EpoxyApplying">3. เคลือบ Epoxy</option>
+                                    <option value="@InstallationStep.Completed">4. ส่งมอบงาน</option>
+                                </select>
+                            </div>
+
+                            <!-- Set status to this step button -->
+                            @if (selectedProject.StepStatus != selectedStepperStep)
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-info w-100 mb-3" @onclick="() => SetStep(selectedStepperStep)">
+                                    <i class="bi bi-check-circle"></i> ปรับโครงการให้มาอยู่ขั้นตอน "@GetStepLabelOnly(selectedStepperStep)"
+                                </button>
+                            }
+                            else
+                            {
+                                <div style="background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.2); border-radius: 6px; padding: 6px 12px; font-size: 0.85rem; color: #22c55e; margin-bottom: 16px; font-weight: 600;" class="text-center">
+                                    <i class="bi bi-check-circle-fill"></i> ขั้นตอนปัจจุบันของโครงการ
+                                </div>
+                            }
+
+                            <!-- Description -->
+                            <div class="form-group">
+                                <label class="form-label">รายละเอียดการดำเนินงานในขั้นตอนนี้</label>
+                                <textarea class="form-control-custom" rows="3" @bind="currentStepDetail.Description" placeholder="พิมพ์อธิบายการทำงานในขั้นตอนนี้..."></textarea>
+                            </div>
+
+                            <!-- Photo upload -->
+                            <div class="form-group">
+                                <label class="form-label">รูปถ่ายหน้างาน</label>
+                                <InputFile class="form-control-custom" OnChange="HandleFileSelected" accept="image/*" />
+                                
+                                @if (!string.IsNullOrWhiteSpace(currentStepDetail.PhotoUrl))
+                                {
+                                    <div style="position: relative; margin-top: 10px; border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1);">
+                                        <img src="@currentStepDetail.PhotoUrl" style="width: 100%; max-height: 200px; object-fit: cover;" />
+                                        <button type="button" class="btn btn-sm btn-danger" style="position: absolute; top: 8px; right: 8px;" @onclick="RemovePhoto">
+                                            <i class="bi bi-trash"></i> ลบรูป
+                                        </button>
+                                    </div>
+                                }
+                            </div>
+
+                            <!-- Materials section -->
+                            <div style="margin-top: 20px;">
+                                <h5 style="font-size: 0.95rem; font-weight: 600; color: var(--text-primary); border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 4px; margin-bottom: 12px;">
+                                    <i class="bi bi-box-seam" style="margin-right: 6px;"></i> วัสดุอุปกรณ์ที่ใช้งานในขั้นตอนนี้
+                                </h5>
+
+                                <!-- Material adder -->
+                                <div style="display: flex; gap: 8px; align-items: flex-end; margin-bottom: 12px;">
+                                    <div style="flex: 2;">
+                                        <label class="form-label" style="font-size: 0.75rem; margin-bottom: 4px;">เลือกวัสดุ</label>
+                                        <select class="form-control-custom" @bind="newMaterialInventoryId" style="font-size: 0.85rem; padding: 8px 10px;">
+                                            <option value="0">-- เลือกวัสดุจากคลัง --</option>
+                                            @foreach (var inv in inventoriesList)
+                                            {
+                                                <option value="@inv.Id">@inv.Name (คงเหลือ: @inv.Quantity.ToString("N1") @inv.Unit)</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <div style="flex: 1;">
+                                        <label class="form-label" style="font-size: 0.75rem; margin-bottom: 4px;">จำนวนที่ใช้</label>
+                                        <input type="number" step="0.1" min="0.1" class="form-control-custom" @bind="newMaterialQuantity" style="font-size: 0.85rem; padding: 8px 10px;" placeholder="0.0" />
+                                    </div>
+                                    <button type="button" class="btn-custom btn-primary-custom" style="padding: 8px 12px; height: 38px;" @onclick="AddMaterialToStep">
+                                        <i class="bi bi-plus-lg"></i> บันทึกและหักคลัง
+                                    </button>
+                                </div>
+
+                                @if (!string.IsNullOrEmpty(stepErrorMessage))
+                                {
+                                    <div style="font-size: 0.8rem; color: #ef4444; margin-bottom: 8px;">
+                                        <i class="bi bi-exclamation-triangle"></i> @stepErrorMessage
+                                    </div>
+                                }
+
+                                <!-- Material list -->
+                                @if (currentStepDetail.UsedMaterials != null && currentStepDetail.UsedMaterials.Any())
+                                {
+                                    <div style="max-height: 180px; overflow-y: auto;">
+                                        <table class="table table-sm table-dark table-striped table-bordered" style="font-size: 0.82rem; border-color: rgba(255,255,255,0.06); background: rgba(0,0,0,0.2);">
+                                            <thead>
+                                                <tr>
+                                                    <th>วัสดุ</th>
+                                                    <th class="text-end" style="width: 100px;">จำนวนที่ใช้</th>
+                                                    <th class="text-center" style="width: 50px;">คืนคลัง</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (var mat in currentStepDetail.UsedMaterials)
+                                                {
+                                                    <tr>
+                                                        <td>@mat.Inventory?.Name</td>
+                                                        <td class="text-end">@mat.QuantityUsed.ToString("N1") @mat.Inventory?.Unit</td>
+                                                        <td class="text-center">
+                                                            <button type="button" class="btn btn-sm btn-link text-danger p-0" title="ลบข้อมูลและคืนวัสดุเข้าคลัง" @onclick="() => RemoveMaterialFromStep(mat)">
+                                                                <i class="bi bi-trash"></i>
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="text-muted text-center py-2" style="font-size: 0.8rem; background: rgba(0,0,0,0.1); border-radius: 8px; border: 1px dashed rgba(255,255,255,0.05);">
+                                        ยังไม่มีการบันทึกการใช้วัสดุในขั้นตอนนี้
+                                    </div>
+                                }
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+                <div class="modal-footer-custom">
+                    <button type="button" class="btn-custom btn-secondary-custom" @onclick="CloseUpdateModal">ยกเลิก</button>
+                    <button type="button" class="btn-custom btn-primary-custom" @onclick="SaveProjectUpdate">บันทึกความคืบหน้า</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Modal for Viewing Detailed Project Progress History -->
+@if (isDetailsModalOpen && selectedProjectDetails != null)
+{
+    <div class="modal-overlay @(isPrintingDetails ? "print-section" : "no-print")" style="background-color: rgba(0,0,0,0.85); overflow-y: auto; display: flex; align-items: flex-start; padding: 40px 10px; z-index: 1100;">
+        <div class="quotation-print-card" style="width: 100%; max-width: 800px; margin: auto; padding: 40px; background: white; border-radius: 8px; color: #333; box-shadow: 0 0 20px rgba(0,0,0,0.5);">
+            
+            <!-- Controls Header (hidden during print) -->
+            <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom no-print" style="border-color: #eee !important;">
+                <span class="text-dark"><strong>ตรวจสอบรายงานความคืบหน้าติดตั้งก่อนพิมพ์</strong></span>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-success" @onclick="TriggerPrintDetails">
+                        <i class="bi bi-printer"></i> พิมพ์
+                    </button>
+                    <button class="btn btn-secondary" @onclick="CloseDetailsModal">ปิดหน้าต่าง</button>
+                </div>
+            </div>
+
+            <!-- Printable Document Body -->
+            <div class="print-header" style="border-bottom: 2px solid #0f2444; padding-bottom: 16px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 16px; text-align: left;">
+                    <img src="images/logo.png" alt="Company Logo" style="height: 68px; width: 68px; object-fit: cover; border-radius: 8px; border: 1px solid #e2e8f0; box-shadow: 0 2px 6px rgba(0,0,0,0.06);" />
+                    <div class="print-company-info">
+                        <h2 style="margin: 0 0 4px 0; color: #0f2444; font-size: 1.35rem; font-weight: 800;">@companyConfig.Name</h2>
+                        <p style="font-size: 0.82rem; margin: 0; color: #475569; line-height: 1.45;">
+                            @companyConfig.Address<br />
+                            โทร: @companyConfig.Phone | อีเมล: @companyConfig.Email | เลขผู้เสียภาษี: @companyConfig.TaxId
+                        </p>
+                    </div>
+                </div>
+                <div class="print-title-area" style="text-align: right;">
+                    <h1 style="margin: 0; font-size: 1.75rem; color: #0f2444; font-weight: 800;">รายงานความคืบหน้า</h1>
+                    <span style="font-size: 0.95rem; font-weight: 700; color: var(--primary);">PROGRESS REPORT</span>
+                </div>
+            </div>
+
+            <div class="print-meta-grid" style="display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 20px; margin-bottom: 24px;">
+                <div class="print-meta-box" style="border: 1px solid #ddd; padding: 15px; border-radius: 6px; font-size: 0.85rem; color: #333; line-height: 1.6; text-align: left;">
+                    <h4 style="margin: 0 0 8px 0; font-size: 0.95rem; border-bottom: 1px solid #eee; padding-bottom: 4px; font-weight: 700;">ข้อมูลลูกค้า</h4>
+                    <strong>ชื่อลูกค้า:</strong> @selectedProjectDetails.Quotation?.Customer?.Name<br />
+                    <strong>เบอร์โทรศัพท์:</strong> @selectedProjectDetails.Quotation?.Customer?.Phone<br />
+                    <strong>ที่อยู่ติดตั้ง:</strong> @selectedProjectDetails.Quotation?.Customer?.Address
+                </div>
+                <div class="print-meta-box" style="border: 1px solid #ddd; padding: 15px; border-radius: 6px; font-size: 0.85rem; color: #333; line-height: 1.6; text-align: left;">
+                    <h4 style="margin: 0 0 8px 0; font-size: 0.95rem; border-bottom: 1px solid #eee; padding-bottom: 4px; font-weight: 700;">ข้อมูลโครงการ</h4>
+                    <strong>เลขที่โครงการ:</strong> PROJ-@selectedProjectDetails.Id<br />
+                    <strong>อ้างอิงใบเสนอราคา:</strong> QT-@selectedProjectDetails.QuotationId<br />
+                    <strong>ทีมช่างผู้รับผิดชอบ:</strong> @(selectedProjectDetails.TechnicianTeam?.TeamName ?? "-") (หัวหน้า: @(selectedProjectDetails.TechnicianTeam?.LeaderName ?? "-"))<br />
+                    <strong>สถานะปัจจุบัน:</strong> @GetStepLabelOnly(selectedProjectDetails.StepStatus)
+                </div>
+                <div class="print-meta-box" style="border: 1px solid #ddd; padding: 15px; border-radius: 6px; font-size: 0.85rem; color: #333; line-height: 1.6; text-align: left;">
+                    <h4 style="margin: 0 0 8px 0; font-size: 0.95rem; border-bottom: 1px solid #eee; padding-bottom: 4px; font-weight: 700;">ข้อมูลการชำระเงิน</h4>
+                    <strong>ราคารวมโครงการ:</strong> ฿@selectedProjectDetails.Quotation?.TotalPrice.ToString("N0") บาท<br />
+                    <strong style="color: #16a34a;">เงินมัดจำ (ชำระแล้ว):</strong> ฿@selectedProjectDetails.Quotation?.DepositAmount.ToString("N0") บาท<br />
+                    <strong style="color: @(selectedProjectDetails.PaymentStatus == PaymentStatus.Paid ? "#16a34a" : "#ea580c"); font-weight: bold;">ยอดเงินงวดสุดท้าย:</strong> ฿@selectedProjectDetails.Quotation?.BalanceAmount.ToString("N0") บาท<br />
+                    <strong>สถานะ:</strong> @(selectedProjectDetails.PaymentStatus == PaymentStatus.Paid ? "ชำระเงินครบถ้วนแล้ว" : "ค้างชำระงวดสุดท้าย")
+                    
+                    @if (!string.IsNullOrEmpty(selectedProjectDetails.Quotation?.PaymentSlipUrl) || !string.IsNullOrEmpty(selectedProjectDetails.FinalPaymentSlipUrl))
+                    {
+                        <div class="no-print mt-2 pt-2 border-top d-flex gap-2">
+                            @if (!string.IsNullOrEmpty(selectedProjectDetails.Quotation?.PaymentSlipUrl))
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-info" style="font-size: 0.75rem; padding: 2px 8px;" @onclick="@(() => OpenImageLightbox(selectedProjectDetails.Quotation.PaymentSlipUrl, $"สลิปมัดจำ QT-{selectedProjectDetails.QuotationId}"))">
+                                    <i class="bi bi-receipt"></i> สลิปมัดจำ
+                                </button>
+                            }
+                            @if (!string.IsNullOrEmpty(selectedProjectDetails.FinalPaymentSlipUrl))
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-success" style="font-size: 0.75rem; padding: 2px 8px;" @onclick="@(() => OpenImageLightbox(selectedProjectDetails.FinalPaymentSlipUrl, $"สลิปงวดสุดท้าย PROJ-{selectedProjectDetails.Id}"))">
+                                    <i class="bi bi-receipt"></i> สลิปงวดสุดท้าย
+                                </button>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <h4 style="margin-bottom: 16px; font-weight: 700; color: #333; border-left: 4px solid var(--primary); padding-left: 8px; text-align: left;">
+                รายละเอียดความคืบหน้าในแต่ละขั้นตอน
+            </h4>
+
+            <div style="display: flex; flex-direction: column; gap: 20px; margin-bottom: 30px; text-align: left;">
+                @foreach (var step in Enum.GetValues<InstallationStep>())
+                {
+                    var stepDetail = projectStepDetails.FirstOrDefault(d => d.Step == step);
+                    var isCompletedStep = selectedProjectDetails.StepStatus >= step;
+
+                    <div style="
+                        background: #fcfcfc;
+                        border: 1px solid @(isCompletedStep ? "#22c55e" : "#eee");
+                        border-radius: 8px;
+                        padding: 15px;
+                        color: #333;
+                    ">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid #f0f0f0; padding-bottom: 6px;">
+                            <h5 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: @(isCompletedStep ? "var(--teal)" : "#666");">
+                                @GetStepName(step)
+                            </h5>
+                            <span style="
+                                font-size: 0.75rem;
+                                font-weight: bold;
+                                padding: 2px 8px;
+                                border-radius: 12px;
+                                background: @(isCompletedStep ? "rgba(34,197,94,0.15)" : "#f0f0f0");
+                                color: @(isCompletedStep ? "#16a34a" : "#666");
+                            ">
+                                @(isCompletedStep ? (selectedProjectDetails.StepStatus == step ? "กำลังดำเนินการ" : "เสร็จสิ้นแล้ว") : "ยังไม่เริ่ม")
+                            </span>
+                        </div>
+
+                        @if (stepDetail != null && isCompletedStep)
+                        {
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start;">
+                                <div style="font-size: 0.85rem; line-height: 1.5;">
+                                    <strong>รายละเอียดการทำงาน:</strong><br />
+                                    <span style="color: #555; white-space: pre-line;">
+                                        @(string.IsNullOrWhiteSpace(stepDetail.Description) ? "ไม่มีรายละเอียดการทำงานบันทึกไว้" : stepDetail.Description)
+                                    </span>
+                                    
+                                    <div style="margin-top: 10px;">
+                                        <strong>วัสดุอุปกรณ์ที่ใช้งาน:</strong>
+                                        @if (stepDetail.UsedMaterials != null && stepDetail.UsedMaterials.Any())
+                                        {
+                                            <ul style="margin: 4px 0 0 0; padding-left: 20px; color: #555;">
+                                                @foreach (var mat in stepDetail.UsedMaterials)
+                                                {
+                                                    <li>@mat.Inventory?.Name (@mat.QuantityUsed.ToString("N1") @mat.Inventory?.Unit)</li>
+                                                }
+                                            </ul>
+                                        }
+                                        else
+                                        {
+                                            <span style="color: #888; margin-left: 6px;">ไม่มีการใช้วัสดุ</span>
+                                        }
+                                    </div>
+                                </div>
+                                <div style="text-align: center;">
+                                    @if (!string.IsNullOrWhiteSpace(stepDetail.PhotoUrl))
+                                    {
+                                        <img src="@stepDetail.PhotoUrl" style="max-width: 100%; max-height: 150px; object-fit: contain; border-radius: 6px; border: 1px solid #ddd; margin-top: 4px;" />
+                                    }
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <span style="font-size: 0.85rem; color: #999;">ไม่มีข้อมูลบันทึกในขั้นตอนนี้</span>
+                        }
+                    </div>
+                }
+            </div>
+
+            <!-- Signatures Section -->
+            <div class="print-signatures" style="display: grid; grid-template-columns: 1fr 1fr; gap: 50px; text-align: center; margin-top: 50px; border-top: 1px solid #eee; padding-top: 30px;">
+                <div style="color: #333; font-size: 0.85rem;">
+                    <p style="margin-bottom: 40px;">ผู้รายงาน / หัวหน้าควบคุมทีมช่าง</p>
+                    <div style="border-top: 1px solid #888; width: 220px; margin: auto; padding-top: 5px;">
+                        ลงชื่อ......................................................<br />
+                        วันที่ ......./......./.......
+                    </div>
+                </div>
+                <div style="color: #333; font-size: 0.85rem;">
+                    <p style="margin-bottom: 40px;">ลูกค้า / ผู้ตรวจรับงาน</p>
+                    <div style="border-top: 1px solid #888; width: 220px; margin: auto; padding-top: 5px;">
+                        ลงชื่อ......................................................<br />
+                        วันที่ ......./......./.......
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+}
+
+<!-- Print Preview Receipt Modal -->
+@if (selectedReceiptProject != null)
+{
+    <div class="modal-overlay @(isPrinting ? "print-section" : "")" style="background-color: rgba(0,0,0,0.85); overflow-y: auto; display: flex; align-items: flex-start; padding: 40px 10px; z-index: 1100;">
+        <div class="quotation-print-card" style="width: 100%; max-width: 800px; margin: auto;">
+            <!-- Receipt control header (hidden when printing) -->
+            <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom no-print">
+                <span class="text-dark"><strong>ตรวจสอบใบเสร็จรับเงินก่อนพิมพ์</strong></span>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-success" @onclick="TriggerPrint">
+                        <i class="bi bi-printer"></i> พิมพ์
+                    </button>
+                    <button class="btn btn-secondary" @onclick="CloseReceiptPreview">ปิดหน้าต่าง</button>
+                </div>
+            </div>
+
+            <!-- Receipt Document Body -->
+            <div class="print-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f2444; padding-bottom: 16px; margin-bottom: 20px;">
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <img src="images/logo.png" alt="Company Logo" style="height: 68px; width: 68px; object-fit: cover; border-radius: 8px; border: 1px solid #e2e8f0; box-shadow: 0 2px 6px rgba(0,0,0,0.06);" />
+                    <div class="print-company-info">
+                        <h2 style="margin: 0 0 4px 0; color: #0f2444; font-size: 1.35rem; font-weight: 800;">@companyConfig.Name</h2>
+                        <p style="font-size: 0.82rem; margin: 0; color: #475569; line-height: 1.45;">
+                            @companyConfig.Address<br />
+                            โทร: @companyConfig.Phone | อีเมล: @companyConfig.Email | เลขผู้เสียภาษี: @companyConfig.TaxId
+                        </p>
+                    </div>
+                </div>
+                <div class="print-title-area" style="text-align: right;">
+                    <h1 style="margin: 0; font-size: 1.8rem; font-weight: 800; color: #0f2444;">ใบเสร็จรับเงิน</h1>
+                    <span style="font-size: 0.95rem; font-weight: bold; color: var(--success);">RECEIPT</span>
+                </div>
+            </div>
+
+            <div class="print-meta-grid text-dark">
+                <div class="print-meta-box">
+                    <h4>ข้อมูลผู้ชำระเงิน</h4>
+                    <strong>ชื่อลูกค้า:</strong> @selectedReceiptProject.Quotation?.Customer?.Name<br />
+                    <strong>เบอร์โทรศัพท์:</strong> @selectedReceiptProject.Quotation?.Customer?.Phone<br />
+                    <strong>ที่อยู่ติดตั้ง:</strong> @selectedReceiptProject.Quotation?.Customer?.Address
+                </div>
+                <div class="print-meta-box">
+                    <h4>ข้อมูลใบเสร็จรับเงิน</h4>
+                    <strong>เลขที่ใบเสร็จ:</strong> RC-@selectedReceiptProject.Id<br />
+                    <strong>อ้างอิงใบเสนอราคา:</strong> QT-@selectedReceiptProject.QuotationId<br />
+                    <strong>วันที่ชำระเงิน:</strong> @(selectedReceiptProject.PaymentDate?.ToString("dd MMMM yyyy") ?? "-")<br />
+                    <strong>ผู้รับเงิน:</strong> @(AuthService.CurrentUser?.FullName ?? "ฝ่ายบัญชีการเงิน")
+                </div>
+            </div>
+
+            <table class="print-table text-dark">
+                <thead>
+                    <tr>
+                        <th style="width: 50px;" class="text-center">ลำดับ</th>
+                        <th>รายการ</th>
+                        <th style="width: 150px;" class="text-end">ราคารวมโครงการ (บาท)</th>
+                        <th style="width: 150px;" class="text-end">ชำระแล้ว (บาท)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="text-center">1</td>
+                        <td>
+                            <strong>@selectedReceiptProject.Quotation?.JobDescription</strong><br />
+                            <span style="font-size: 0.8rem; color: #555;">(ขนาดพื้นที่: @selectedReceiptProject.Quotation?.AreaSqm.ToString("N0") ตารางเมตร | ดำเนินการโดย: @selectedReceiptProject.TechnicianTeam?.TeamName)</span>
+                        </td>
+                        <td class="text-end">฿@selectedReceiptProject.Quotation?.TotalPrice.ToString("N0")</td>
+                        <td class="text-end" style="font-weight: bold;">฿@selectedReceiptProject.Quotation?.TotalPrice.ToString("N0")</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="print-summary-area text-dark" style="margin-bottom: 20px;">
+                <table class="print-summary-table">
+                    <tr>
+                        <td>รับเงินมัดจำล่วงหน้า (แล้ว)</td>
+                        <td class="text-end">฿@selectedReceiptProject.Quotation?.DepositAmount.ToString("N0")</td>
+                    </tr>
+                    <tr>
+                        <td>รับเงินงวดสุดท้าย (แล้ว)</td>
+                        <td class="text-end">฿@selectedReceiptProject.Quotation?.BalanceAmount.ToString("N0")</td>
+                    </tr>
+                    @if (selectedReceiptProject.LatePenaltyAmount > 0)
+                    {
+                        <tr>
+                            <td style="color: #dc2626;">ค่าปรับชำระเงินล่าช้า (@selectedReceiptProject.OverdueDays วัน × 3%/วัน)</td>
+                            <td class="text-end" style="color: #dc2626; font-weight: bold;">+ ฿@selectedReceiptProject.LatePenaltyAmount.ToString("N0")</td>
+                        </tr>
+                    }
+                    <tr class="total-row" style="color: var(--success);">
+                        <td>ยอดเงินชำระครบถ้วนสุทธิ</td>
+                        <td class="text-end">฿@((selectedReceiptProject.Quotation?.DepositAmount ?? 0) + selectedReceiptProject.TotalPayableAmount).ToString("N0")</td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="print-signatures text-dark" style="margin-top: 45px;">
+                <div>
+                    <p>ผู้ชำระเงิน</p>
+                    <div class="signature-line">
+                        ลงชื่อ......................................................<br />
+                        วันที่ ......./......./.......
+                    </div>
+                </div>
+                <div>
+                    <p>ผู้รับเงิน / เจ้าหน้าที่การเงิน</p>
+                    <div class="signature-line">
+                        ลงชื่อ......................................................<br />
+                        วันที่ ......./......./.......
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Modal for Payment Confirmation before Receipt Issuance -->
+@if (isPaymentConfirmModalOpen && projectToConfirmPayment != null)
+{
+    <div class="modal-overlay no-print" style="z-index: 1150;">
+        <div class="modal-content-custom" style="max-width: 550px; background: #ffffff; border-radius: 14px; box-shadow: 0 20px 40px rgba(0,0,0,0.25); border: none; overflow: hidden; color: #1e293b;">
+            <!-- Modal Header -->
+            <div class="modal-header-custom" style="background: linear-gradient(135deg, #059669, #10b981); color: white; padding: 18px 24px; display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="color: white; margin: 0; font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                    <i class="bi bi-wallet2"></i> บันทึกรับชำระเงินงวดสุดท้าย
+                </h3>
+                <button class="modal-close-btn" style="color: white; background: rgba(255,255,255,0.2);" @onclick="ClosePaymentConfirmModal">&times;</button>
+            </div>
+
+            <div class="modal-body-custom" style="padding: 24px; max-height: 75vh; overflow-y: auto; background: #ffffff;">
+                <!-- Due Date & Overdue Status Alert -->
+                @if (projectToConfirmPayment.OverdueDays > 0)
+                {
+                    <div style="background: #fff1f2; border: 1.5px solid #fca5a5; border-radius: 8px; padding: 12px 14px; margin-bottom: 16px; color: #991b1b;">
+                        <div style="font-weight: 700; font-size: 0.95rem; display: flex; align-items: center; gap: 6px;">
+                            <i class="bi bi-exclamation-triangle-fill text-danger"></i> ชำระเกินกำหนดเวลา 7 วัน (ล่าช้า @projectToConfirmPayment.OverdueDays วัน)
+                        </div>
+                        <div style="font-size: 0.85rem; margin-top: 4px; color: #b91c1c; line-height: 1.5;">
+                            วันครบกำหนดคือ: <strong>@projectToConfirmPayment.DueDate?.ToString("dd MMMM yyyy")</strong><br />
+                            คิดค่าปรับชำระล่าช้า 3% ต่อวัน (จากยอดคงเหลือ): <strong style="font-size: 0.95rem;">+ ฿@projectToConfirmPayment.LatePenaltyAmount.ToString("N0")</strong>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; color: #166534; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <i class="bi bi-shield-check text-success me-1"></i> อยู่ในกำหนดเวลาชำระเงิน (ครบกำหนด: <strong>@projectToConfirmPayment.DueDate?.ToString("dd MMMM yyyy")</strong>)
+                        </div>
+                        <span class="badge bg-success" style="font-size: 0.75rem;">เหลืออีก @projectToConfirmPayment.DaysRemaining วัน</span>
+                    </div>
+                }
+
+                <!-- Project Summary Card -->
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; margin-bottom: 18px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="font-size: 0.85rem; color: #64748b;">รหัสโครงการ:</span>
+                        <strong style="color: var(--primary); font-size: 0.95rem;">PROJ-@projectToConfirmPayment.Id (QT-@projectToConfirmPayment.QuotationId)</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                        <span style="font-size: 0.85rem; color: #64748b;">ลูกค้า:</span>
+                        <strong style="color: #0f172a; text-align: right;">@projectToConfirmPayment.Quotation?.Customer?.Name</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                        <span style="font-size: 0.85rem; color: #64748b;">วันที่ส่งมอบงานเสร็จ:</span>
+                        <span style="color: #0f172a; font-weight: 600; font-size: 0.85rem;">@projectToConfirmPayment.EndDate?.ToString("dd MMMM yyyy")</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+                        <span style="font-size: 0.85rem; color: #64748b;">ลักษณะงาน:</span>
+                        <span style="color: #334155; font-size: 0.85rem; text-align: right; max-width: 60%;">@projectToConfirmPayment.Quotation?.JobDescription</span>
+                    </div>
+
+                    <div style="border-top: 1px dashed #cbd5e1; padding-top: 10px; margin-top: 6px; display: flex; flex-direction: column; gap: 6px;">
+                        <div style="display: flex; justify-content: space-between; font-size: 0.88rem; color: #475569;">
+                            <span>ราคารวมโครงการทั้งสิ้น:</span>
+                            <strong style="color: #0f172a;">฿@projectToConfirmPayment.Quotation?.TotalPrice.ToString("N0")</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.88rem; color: #059669;">
+                            <span>หักเงินมัดจำ (ชำระแล้ว):</span>
+                            <span>- ฿@projectToConfirmPayment.Quotation?.DepositAmount.ToString("N0")</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.95rem; color: #0f172a; font-weight: 600;">
+                            <span>ยอดเงินงวดสุดท้ายคงเหลือ:</span>
+                            <span>฿@projectToConfirmPayment.Quotation?.BalanceAmount.ToString("N0")</span>
+                        </div>
+                        @if (projectToConfirmPayment.OverdueDays > 0)
+                        {
+                            <div style="display: flex; justify-content: space-between; font-size: 0.92rem; color: #dc2626; font-weight: 700; background: #fee2e2; padding: 4px 8px; border-radius: 4px;">
+                                <span>ค่าปรับล่าช้า (@projectToConfirmPayment.OverdueDays วัน × 3%/วัน):</span>
+                                <span>+ ฿@projectToConfirmPayment.LatePenaltyAmount.ToString("N0")</span>
+                            </div>
+                        }
+                        <div style="display: flex; justify-content: space-between; font-size: 1.15rem; font-weight: 800; color: @(projectToConfirmPayment.OverdueDays > 0 ? "#dc2626" : "#16a34a"); padding-top: 8px; border-top: 1px solid #e2e8f0; margin-top: 4px;">
+                            <span>ยอดรวมรับชำระสุทธิ:</span>
+                            <span>฿@projectToConfirmPayment.TotalPayableAmount.ToString("N0")</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Slip Upload Box -->
+                <div class="form-group mb-3">
+                    <label class="form-label" style="font-weight: 600; color: #0f172a; display: flex; align-items: center; gap: 6px; font-size: 0.88rem;">
+                        <i class="bi bi-receipt text-success"></i> แนบรูปภาพสลิปโอนเงินงวดสุดท้าย
+                    </label>
+                    <div style="border: 2px dashed #94a3b8; border-radius: 8px; padding: 16px; text-align: center; background: #f8fafc;">
+                        <InputFile OnChange="OnFinalPaymentSlipSelected" accept="image/*" class="form-control" id="final-pay-slip-file" style="display: none;" />
+                        <label for="final-pay-slip-file" class="btn btn-outline-primary btn-sm mb-0" style="cursor: pointer; padding: 7px 18px; font-weight: 600; font-size: 0.85rem; border-radius: 6px;">
+                            <i class="bi bi-cloud-arrow-up-fill me-1"></i> เลือกรูปภาพสลิป
+                        </label>
+                        <div class="text-muted mt-2" style="font-size: 0.75rem;">รองรับไฟล์รูปภาพ JPG, PNG, WebP</div>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(finalPaymentSlipDataUrl))
+                    {
+                        <div class="mt-3 text-center" style="background: #f1f5f9; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e1;">
+                            <img src="@finalPaymentSlipDataUrl" alt="Slip" style="max-height: 200px; max-width: 100%; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); cursor: pointer;" 
+                                 title="คลิกดูภาพขยาย"
+                                 @onclick="@(() => OpenImageLightbox(finalPaymentSlipDataUrl, "สลิปโอนเงินงวดสุดท้าย"))" />
+                            <div class="mt-2">
+                                <button type="button" class="btn btn-sm btn-outline-danger" style="font-size: 0.78rem; padding: 3px 12px;" @onclick="() => finalPaymentSlipDataUrl = null">
+                                    <i class="bi bi-trash me-1"></i> ลบรูปสลิป
+                                </button>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <!-- Note Input -->
+                <div class="form-group mb-3">
+                    <label class="form-label" style="font-size: 0.85rem; font-weight: 600; color: #0f172a;">หมายเหตุการชำระเงิน / เลขที่อ้างอิง</label>
+                    <input type="text" class="form-control-custom" @bind="finalPaymentNote" placeholder="เช่น โอนเข้า บช. กสิกรไทย เวลา 15:45 น." />
+                </div>
+
+                <!-- Confirmation Checkbox Box -->
+                <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 14px; display: flex; gap: 12px; align-items: flex-start;">
+                    <input type="checkbox" id="confirm-payment-chk" @bind="hasConfirmedFinalPaymentCheckbox" style="width: 22px; height: 22px; cursor: pointer; margin-top: 2px; accent-color: #16a34a;" />
+                    <label for="confirm-payment-chk" style="font-size: 0.85rem; cursor: pointer; user-select: none; color: #166534; font-weight: 600; line-height: 1.5;">
+                        ขอยืนยันว่าได้รับการชำระเงินงวดสุดท้าย จำนวน ฿@projectToConfirmPayment.TotalPayableAmount.ToString("N0") @(projectToConfirmPayment.OverdueDays > 0 ? "(รวมค่าปรับชำระล่าช้า)" : "") เรียบร้อยแล้วจริง และขอเปิดสิทธิ์ให้ออกใบเสร็จรับเงิน
+                    </label>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="modal-footer-custom" style="padding: 14px 24px; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 12px;">
+                <button type="button" class="btn-custom btn-secondary-custom" @onclick="ClosePaymentConfirmModal">ยกเลิก</button>
+                <button type="button" class="btn-custom btn-primary-custom" style="background: linear-gradient(135deg, #059669, #10b981); color: white; font-weight: 600; padding: 8px 20px;" 
+                        disabled="@(!hasConfirmedFinalPaymentCheckbox)" @onclick="ConfirmFinalPaymentSave">
+                    <i class="bi bi-check2-circle me-1"></i> ยืนยันการชำระเงิน & เปิดสิทธิ์ใบเสร็จ
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Lightbox Modal for Images -->
+@if (isLightboxOpen && !string.IsNullOrEmpty(lightboxImageUrl))
+{
+    <div class="modal-overlay no-print" style="z-index: 1300;" @onclick="CloseImageLightbox">
+        <div class="modal-content-custom" style="max-width: 750px; width: 95%; background: #0f172a; border: 1px solid rgba(255,255,255,0.1);" @onclick:stopPropagation="true">
+            <div class="modal-header-custom" style="background: #1e293b; color: white;">
+                <h3 style="color: white; margin: 0; font-size: 1rem; font-weight: 700;"><i class="bi bi-image me-1"></i> @lightboxImageTitle</h3>
+                <button class="modal-close-btn" style="color: white;" @onclick="CloseImageLightbox">&times;</button>
+            </div>
+            <div class="modal-body-custom text-center" style="padding: 20px; background: #0f172a;">
+                <img src="@lightboxImageUrl" alt="รูปภาพขยาย" style="max-width: 100%; max-height: 75vh; object-fit: contain; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);" />
+            </div>
+            <div class="modal-footer-custom" style="background: #1e293b; border-color: rgba(255,255,255,0.08);">
+                <button class="btn-custom btn-secondary-custom" @onclick="CloseImageLightbox">ปิดหน้าต่าง</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<InstallationProcess> projects = new();
+    private List<TechnicianTeam> teams = new();
+    private List<Inventory> inventoriesList = new();
+
+    private bool isUpdateModalOpen = false;
+    private InstallationProcess? selectedProject = null;
+
+    // Selected stepper step editor states
+    private InstallationStep selectedStepperStep = InstallationStep.SurfacePrep;
+    private InstallationStepDetail currentStepDetail = new();
+    private int newMaterialInventoryId = 0;
+    private decimal newMaterialQuantity = 0;
+    private string stepErrorMessage = string.Empty;
+
+    // View progress history states
+    private bool isDetailsModalOpen = false;
+    private InstallationProcess? selectedProjectDetails = null;
+    private List<InstallationStepDetail> projectStepDetails = new();
+
+    // Payment confirmation states
+    private bool isPaymentConfirmModalOpen = false;
+    private InstallationProcess? projectToConfirmPayment = null;
+    private bool hasConfirmedFinalPaymentCheckbox = false;
+    private string? finalPaymentSlipDataUrl = null;
+    private string finalPaymentNote = string.Empty;
+
+    // Lightbox modal states
+    private bool isLightboxOpen = false;
+    private string lightboxImageUrl = string.Empty;
+    private string lightboxImageTitle = string.Empty;
+
+    // Printing receipt states
+    private InstallationProcess? selectedReceiptProject = null;
+    private bool isPrinting = false;
+    private bool isPrintingDetails = false;
+    private CompanyProfile companyConfig = new();
+
+    protected override void OnInitialized()
+    {
+        LoadData();
+    }
+
+    private void LoadData()
+    {
+        companyConfig = Db.CompanyProfiles.FirstOrDefault() ?? new CompanyProfile();
+        teams = Db.TechnicianTeams.OrderBy(t => t.TeamName).ToList();
+        projects = Db.InstallationProcesses
+            .Include(p => p.Quotation)
+            .ThenInclude(q => q!.Customer)
+            .Include(p => p.TechnicianTeam)
+            .OrderByDescending(p => p.Id)
+            .ToList();
+        inventoriesList = Db.Inventories.OrderBy(i => i.Name).ToList();
+    }
+
+    private void OpenUpdateModal(InstallationProcess p)
+    {
+        selectedProject = p;
+        selectedStepperStep = p.StepStatus;
+        LoadStepDetail();
+        isUpdateModalOpen = true;
+    }
+
+    private void CloseUpdateModal()
+    {
+        isUpdateModalOpen = false;
+        selectedProject = null;
+    }
+
+    private void LoadStepDetail()
+    {
+        if (selectedProject == null) return;
+        stepErrorMessage = string.Empty;
+        newMaterialInventoryId = 0;
+        newMaterialQuantity = 0;
+
+        var detail = Db.InstallationStepDetails
+            .Include(d => d.UsedMaterials)
+            .ThenInclude(m => m.Inventory)
+            .FirstOrDefault(d => d.InstallationProcessId == selectedProject.Id && d.Step == selectedStepperStep);
+
+        if (detail != null)
+        {
+            currentStepDetail = detail;
+        }
+        else
+        {
+            currentStepDetail = new InstallationStepDetail
+            {
+                InstallationProcessId = selectedProject.Id,
+                Step = selectedStepperStep,
+                Description = string.Empty,
+                PhotoUrl = string.Empty,
+                UsedMaterials = new List<InstallationStepMaterial>()
+            };
+        }
+    }
+
+    private void OnSelectedStepperStepChanged(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<InstallationStep>(e.Value?.ToString(), out var step))
+        {
+            // Save current step details changes to local variable first
+            SaveCurrentStepDetailTemporarily();
+            selectedStepperStep = step;
+            LoadStepDetail();
+        }
+    }
+
+    private void SaveCurrentStepDetailTemporarily()
+    {
+        if (selectedProject == null) return;
+
+        // Auto-upsert step detail record
+        var existing = Db.InstallationStepDetails.FirstOrDefault(d => 
+            d.InstallationProcessId == selectedProject.Id && d.Step == selectedStepperStep);
+
+        if (existing != null)
+        {
+            existing.Description = currentStepDetail.Description;
+            existing.PhotoUrl = currentStepDetail.PhotoUrl;
+            Db.InstallationStepDetails.Update(existing);
+        }
+        else
+        {
+            if (!string.IsNullOrWhiteSpace(currentStepDetail.Description) || !string.IsNullOrWhiteSpace(currentStepDetail.PhotoUrl))
+            {
+                Db.InstallationStepDetails.Add(currentStepDetail);
+            }
+        }
+        Db.SaveChanges();
+    }
+
+    private void SetStep(InstallationStep step)
+    {
+        if (selectedProject != null)
+        {
+            selectedProject.StepStatus = step;
+            if (step == InstallationStep.Completed)
+            {
+                selectedProject.EndDate = DateTime.Now;
+            }
+            else
+            {
+                selectedProject.EndDate = null;
+            }
+            
+            // Sync current editor to the new step
+            SaveCurrentStepDetailTemporarily();
+            selectedStepperStep = step;
+            LoadStepDetail();
+        }
+    }
+
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file != null)
+        {
+            try
+            {
+                var resizedImage = await file.RequestImageFileAsync("image/jpeg", 800, 600);
+                var buffer = new byte[resizedImage.Size];
+                using (var stream = resizedImage.OpenReadStream(1024 * 1024 * 10)) // Max 10MB
+                {
+                    int totalRead = 0;
+                    while (totalRead < buffer.Length)
+                    {
+                        int read = await stream.ReadAsync(buffer, totalRead, buffer.Length - totalRead);
+                        if (read == 0) break;
+                        totalRead += read;
+                    }
+                }
+                currentStepDetail.PhotoUrl = $"data:image/jpeg;base64,{Convert.ToBase64String(buffer)}";
+                SaveCurrentStepDetailTemporarily();
+            }
+            catch (Exception ex)
+            {
+                stepErrorMessage = "เกิดข้อผิดพลาดในการโหลดไฟล์รูปภาพ: " + ex.Message;
+            }
+        }
+    }
+
+    private void RemovePhoto()
+    {
+        currentStepDetail.PhotoUrl = string.Empty;
+        SaveCurrentStepDetailTemporarily();
+    }
+
+    private void AddMaterialToStep()
+    {
+        stepErrorMessage = string.Empty;
+
+        if (newMaterialInventoryId == 0)
+        {
+            stepErrorMessage = "กรุณาเลือกวัสดุอุปกรณ์";
+            return;
+        }
+
+        if (newMaterialQuantity <= 0)
+        {
+            stepErrorMessage = "กรุณาระบุจำนวนที่มากกว่า 0";
+            return;
+        }
+
+        var inv = Db.Inventories.Find(newMaterialInventoryId);
+        if (inv == null) return;
+
+        if (inv.Quantity < newMaterialQuantity)
+        {
+            stepErrorMessage = $"วัสดุคงเหลือในคลังไม่พอใช้ (คงเหลือ: {inv.Quantity.ToString("N1")} {inv.Unit})";
+            return;
+        }
+
+        // Deduct from inventory in real-time
+        inv.Quantity -= newMaterialQuantity;
+        Db.Inventories.Update(inv);
+
+        // Ensure current step detail is saved to db to have a valid ID
+        if (currentStepDetail.Id == 0)
+        {
+            Db.InstallationStepDetails.Add(currentStepDetail);
+            Db.SaveChanges();
+        }
+
+        var usedMat = new InstallationStepMaterial
+        {
+            InstallationStepDetailId = currentStepDetail.Id,
+            InventoryId = newMaterialInventoryId,
+            QuantityUsed = newMaterialQuantity
+        };
+
+        Db.InstallationStepMaterials.Add(usedMat);
+        Db.SaveChanges();
+
+        // Reload data
+        inventoriesList = Db.Inventories.OrderBy(i => i.Name).ToList();
+        LoadStepDetail();
+    }
+
+    private void RemoveMaterialFromStep(InstallationStepMaterial mat)
+    {
+        // Restore stock to inventory in real-time
+        var inv = Db.Inventories.Find(mat.InventoryId);
+        if (inv != null)
+        {
+            inv.Quantity += mat.QuantityUsed;
+            Db.Inventories.Update(inv);
+        }
+
+        Db.InstallationStepMaterials.Remove(mat);
+        Db.SaveChanges();
+
+        // Reload data
+        inventoriesList = Db.Inventories.OrderBy(i => i.Name).ToList();
+        LoadStepDetail();
+    }
+
+    private void SaveProjectUpdate()
+    {
+        if (selectedProject != null)
+        {
+            // Save current editor details first
+            SaveCurrentStepDetailTemporarily();
+
+            // If completed, update technicians status back to Available
+            if (selectedProject.StepStatus == InstallationStep.Completed && selectedProject.TechnicianTeamId.HasValue)
+            {
+                var techsInTeam = Db.Technicians.Where(t => t.TeamId == selectedProject.TechnicianTeamId.Value).ToList();
+                foreach (var tech in techsInTeam)
+                {
+                    tech.Status = TechnicianStatus.Available;
+                    Db.Technicians.Update(tech);
+                }
+            }
+            else if (selectedProject.TechnicianTeamId.HasValue)
+            {
+                // Set technicians in that team to Busy
+                var techsInTeam = Db.Technicians.Where(t => t.TeamId == selectedProject.TechnicianTeamId.Value).ToList();
+                foreach (var tech in techsInTeam)
+                {
+                    tech.Status = TechnicianStatus.Busy;
+                    Db.Technicians.Update(tech);
+                }
+            }
+
+            Db.InstallationProcesses.Update(selectedProject);
+            Db.SaveChanges();
+            isUpdateModalOpen = false;
+            LoadData();
+        }
+    }
+
+    // Details viewer popup handlers
+    private void OpenDetailsModal(InstallationProcess p)
+    {
+        selectedProjectDetails = p;
+        projectStepDetails = Db.InstallationStepDetails
+            .Include(d => d.UsedMaterials)
+            .ThenInclude(m => m.Inventory)
+            .Where(d => d.InstallationProcessId == p.Id)
+            .ToList();
+        isDetailsModalOpen = true;
+    }
+
+    private void CloseDetailsModal()
+    {
+        isDetailsModalOpen = false;
+        selectedProjectDetails = null;
+        projectStepDetails = new();
+        isPrintingDetails = false;
+    }
+
+    private async Task TriggerPrintDetails()
+    {
+        isPrintingDetails = true;
+        StateHasChanged();
+        await Task.Delay(200);
+        await JS.InvokeVoidAsync("window.print");
+        isPrintingDetails = false;
+        StateHasChanged();
+    }
+
+    private void OpenPaymentConfirmModal(InstallationProcess p)
+    {
+        projectToConfirmPayment = p;
+        hasConfirmedFinalPaymentCheckbox = false;
+        finalPaymentSlipDataUrl = null;
+        finalPaymentNote = string.Empty;
+        isPaymentConfirmModalOpen = true;
+    }
+
+    private void ClosePaymentConfirmModal()
+    {
+        isPaymentConfirmModalOpen = false;
+        projectToConfirmPayment = null;
+        hasConfirmedFinalPaymentCheckbox = false;
+        finalPaymentSlipDataUrl = null;
+        finalPaymentNote = string.Empty;
+    }
+
+    private async Task OnFinalPaymentSlipSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file != null)
+        {
+            try
+            {
+                var resizedFile = await file.RequestImageFileAsync(file.ContentType, 1200, 1200);
+                using var stream = resizedFile.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+                using var ms = new MemoryStream();
+                await stream.CopyToAsync(ms);
+                var base64 = Convert.ToBase64String(ms.ToArray());
+                finalPaymentSlipDataUrl = $"data:{file.ContentType};base64,{base64}";
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error uploading slip: {ex.Message}");
+            }
+        }
+    }
+
+    private void ConfirmFinalPaymentSave()
+    {
+        if (projectToConfirmPayment == null || !hasConfirmedFinalPaymentCheckbox) return;
+
+        var penalty = projectToConfirmPayment.LatePenaltyAmount;
+        var totalAmount = projectToConfirmPayment.TotalPayableAmount;
+        var overdueDays = projectToConfirmPayment.OverdueDays;
+
+        var note = finalPaymentNote;
+        if (overdueDays > 0)
+        {
+            var penaltyNote = $"[รวมค่าปรับชำระล่าช้า {overdueDays} วัน (3%/วัน) +฿{penalty:N0}]";
+            note = string.IsNullOrWhiteSpace(note) ? penaltyNote : $"{note} {penaltyNote}";
+        }
+
+        // 1. Mark Project as Paid and attach slip details
+        projectToConfirmPayment.PaymentStatus = PaymentStatus.Paid;
+        projectToConfirmPayment.PaymentDate = DateTime.Now;
+        projectToConfirmPayment.FinalPaymentSlipUrl = finalPaymentSlipDataUrl;
+        projectToConfirmPayment.FinalPaymentNote = note;
+        projectToConfirmPayment.FinalPaymentApprovedBy = AuthService.CurrentUser?.FullName ?? "ฝ่ายบัญชีการเงิน";
+        Db.InstallationProcesses.Update(projectToConfirmPayment);
+
+        // 2. Automatically log final balance payment into Finance ledger
+        var finalIncomeEntry = new Finance
+        {
+            Type = FinanceType.Income,
+            Amount = totalAmount,
+            Description = $"[รายรับงวดสุดท้าย] ค่าติดตั้งพื้นส่วนที่เหลือ ใบเสนอราคา QT-{projectToConfirmPayment.QuotationId} ลูกค้า {projectToConfirmPayment.Quotation?.Customer?.Name}" + (!string.IsNullOrEmpty(note) ? $" ({note})" : ""),
+            RecordedDate = DateTime.Now,
+            QuotationId = projectToConfirmPayment.QuotationId,
+            ReferenceNo = $"REC-FN{projectToConfirmPayment.QuotationId}"
+        };
+        Db.Finances.Add(finalIncomeEntry);
+
+        Db.SaveChanges();
+        ClosePaymentConfirmModal();
+        LoadData();
+    }
+
+    private void OpenImageLightbox(string imageUrl, string title)
+    {
+        lightboxImageUrl = imageUrl;
+        lightboxImageTitle = title;
+        isLightboxOpen = true;
+    }
+
+    private void CloseImageLightbox()
+    {
+        isLightboxOpen = false;
+        lightboxImageUrl = string.Empty;
+        lightboxImageTitle = string.Empty;
+    }
+
+    // Receipt printing methods
+    private void OpenReceiptPreview(InstallationProcess p)
+    {
+        selectedReceiptProject = p;
+    }
+
+    private void CloseReceiptPreview()
+    {
+        selectedReceiptProject = null;
+        isPrinting = false;
+    }
+
+    private async Task TriggerPrint()
+    {
+        isPrinting = true;
+        StateHasChanged();
+        await Task.Delay(200);
+        await JS.InvokeVoidAsync("window.print");
+        isPrinting = false;
+        StateHasChanged();
+    }
+
+    private string GetStepName(InstallationStep step) => step switch
+    {
+        InstallationStep.SurfacePrep => "1. เตรียมพื้นผิว",
+        InstallationStep.Priming => "2. ทาสีรองพื้น",
+        InstallationStep.EpoxyApplying => "3. เคลือบ Epoxy",
+        InstallationStep.Completed => "4. เสร็จสิ้น (ส่งมอบงาน)",
+        _ => ""
+    };
+
+    private string GetStepLabelOnly(InstallationStep step) => step switch
+    {
+        InstallationStep.SurfacePrep => "เตรียมพื้นผิว",
+        InstallationStep.Priming => "ทาสีรองพื้น",
+        InstallationStep.EpoxyApplying => "เคลือบ Epoxy",
+        InstallationStep.Completed => "ส่งมอบงาน",
+        _ => ""
+    };
+
+    private string GetStepBadgeClass(InstallationStep step) => step switch
+    {
+        InstallationStep.SurfacePrep => "draft",
+        InstallationStep.Priming => "warning",
+        InstallationStep.EpoxyApplying => "busy",
+        InstallationStep.Completed => "approved",
+        _ => ""
+    };
+
+    private string GetPaymentStatusText(PaymentStatus status) => status switch
+    {
+        PaymentStatus.Paid => "ชำระเงินครบถ้วน",
+        PaymentStatus.Pending => "ค้างชำระส่วนที่เหลือ",
+        _ => ""
+    };
+
+    // Stepper helpers
+    private int GetStepperProgressWidth(InstallationStep step) => step switch
+    {
+        InstallationStep.SurfacePrep => 0,
+        InstallationStep.Priming => 33,
+        InstallationStep.EpoxyApplying => 66,
+        InstallationStep.Completed => 100,
+        _ => 0
+    };
+
+    private string GetStepNodeClass(InstallationStep currentStep, InstallationStep nodeStep)
+    {
+        if (currentStep == nodeStep) return "active";
+        if (currentStep > nodeStep) return "completed";
+        return "";
+    }
+}

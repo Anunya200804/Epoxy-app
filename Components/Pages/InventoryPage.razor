@@ -1,0 +1,1203 @@
+@page "/inventory"
+@page "/stockin"
+@inject EpoxyDbContext Db
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+
+<PageTitle>จัดการวัสดุและอุปกรณ์ - ระบบการจัดการพื้น Epoxy</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-1" style="font-weight: 700; color: var(--primary);">จัดการวัสดุและอุปกรณ์</h2>
+        <p class="text-muted mb-0">บริหารจัดการข้อมูลคลังสินค้าคงคลัง และบันทึกประวัติการรับเข้าวัสดุอุปกรณ์สำหรับการติดตั้ง</p>
+    </div>
+    @if (AuthService.CurrentUser?.Role == UserRole.Admin || AuthService.CurrentUser?.Role == UserRole.ProjectManager)
+    {
+        @if (activeTab == "inventory")
+        {
+            <button class="btn-custom btn-primary-custom" @onclick="OpenAddModal">
+                <i class="bi bi-plus-circle-fill"></i> เพิ่มวัสดุใหม่
+            </button>
+        }
+        else if (activeTab == "stockin")
+        {
+            <button class="btn-custom btn-primary-custom" @onclick="OpenAddStockInModal">
+                <i class="bi bi-journal-arrow-down"></i> บันทึกรับเข้าวัสดุ
+            </button>
+        }
+    }
+</div>
+
+<!-- Tabs layout -->
+<div class="card-panel">
+    <div class="d-flex border-bottom mb-4 gap-2">
+        <button class="btn pb-2 px-3 @(activeTab == "inventory" ? "border-bottom border-primary border-3 fw-bold text-primary" : "text-muted")" style="background: none; border: none; border-radius: 0;" @onclick='() => SetTab("inventory")'>
+            <i class="bi bi-box-seam"></i> คลังวัสดุและอุปกรณ์ (@inventories.Count รายการ)
+        </button>
+        <button class="btn pb-2 px-3 @(activeTab == "stockin" ? "border-bottom border-primary border-3 fw-bold text-primary" : "text-muted")" style="background: none; border: none; border-radius: 0;" @onclick='() => SetTab("stockin")'>
+            <i class="bi bi-journal-arrow-down"></i> ประวัติการรับเข้าวัสดุ (@stockIns.Count รายการ)
+        </button>
+    </div>
+
+    @if (activeTab == "inventory")
+    {
+        @if (inventories.Any(i => i.IsLowStock))
+        {
+            var lowStockCount = inventories.Count(i => i.IsLowStock);
+            <div class="alert alert-warning mb-4 d-flex align-items-center gap-3" role="alert">
+                <i class="bi bi-exclamation-triangle-fill" style="font-size: 1.5rem;"></i>
+                <div>
+                    <strong>คำเตือน:</strong> มีวัสดุและอุปกรณ์จำนวน <strong>@lowStockCount</strong> รายการ ใกล้หมดหรือต่ำกว่าจุดสั่งซื้อขั้นต่ำ! 
+                    รบกวนดำเนินการสั่งซื้อเพิ่มเติม หรือทำรับเข้าเพื่อไม่ให้ส่งผลกระทบต่องานติดตั้ง
+                </div>
+            </div>
+        }
+
+        <!-- Search Panel -->
+        <div class="search-bar-panel">
+            <div class="search-input-wrapper">
+                <i class="bi bi-search"></i>
+                <input type="text" class="form-control-custom" placeholder="ค้นหาด้วยชื่อวัสดุ..." @bind="searchQuery" @bind:event="oninput" @onkeyup="Search" />
+            </div>
+            <select class="form-control-custom" style="width: auto; min-width: 150px;" @bind="filterStockLevel" @bind:after="Search">
+                <option value="">-- ระดับคลังสินค้าทั้งหมด --</option>
+                <option value="Low">ใกล้หมด / ต่ำกว่าจุดสั่งซื้อ</option>
+                <option value="OK">ปกติ (เพียงพอ)</option>
+            </select>
+            <button class="btn-custom btn-secondary-custom" @onclick="ClearSearch">ล้างค่า</button>
+        </div>
+
+        <!-- Inventory Table -->
+        <div class="custom-table-container">
+            <table class="custom-table">
+                <thead>
+                    <tr>
+                        <th>รหัสสินค้า</th>
+                        <th>ชื่อวัสดุ / อุปกรณ์</th>
+                        <th class="text-end">จำนวนคงเหลือ</th>
+                        <th>หน่วยนับ</th>
+                        <th class="text-end">ราคาต่อหน่วย</th>
+                        <th class="text-end">จุดสั่งซื้อขั้นต่ำ</th>
+                        <th>การแจ้งเตือน</th>
+                        @if (AuthService.CurrentUser?.Role == UserRole.Admin || AuthService.CurrentUser?.Role == UserRole.ProjectManager)
+                        {
+                            <th class="text-center no-print">จัดการ</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (filteredInventories.Any())
+                    {
+                        @foreach (var i in filteredInventories)
+                        {
+                            <tr>
+                                <td><strong>INV-@i.Id</strong></td>
+                                <td><strong>@i.Name</strong></td>
+                                <td class="text-end" style="font-weight: 600; color: @(i.IsLowStock ? "var(--danger)" : "var(--text-primary)");">
+                                    @i.Quantity.ToString("N1")
+                                </td>
+                                <td>@i.Unit</td>
+                                <td class="text-end" style="font-weight: 600; color: var(--primary);">@(i.UnitPrice > 0 ? i.UnitPrice.ToString("N2") + " บาท" : "-")</td>
+                                <td class="text-end">@i.ReorderPoint.ToString("N1")</td>
+                                <td>
+                                    @if (i.IsLowStock)
+                                    {
+                                        <span class="badge-status badge-cancelled">
+                                            <i class="bi bi-exclamation-circle-fill"></i> ควรสั่งซื้อด่วน
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge-status badge-approved">
+                                            <i class="bi bi-check-circle-fill"></i> เพียงพอ
+                                        </span>
+                                    }
+                                </td>
+                                @if (AuthService.CurrentUser?.Role == UserRole.Admin || AuthService.CurrentUser?.Role == UserRole.ProjectManager)
+                                {
+                                    <td class="text-center no-print">
+                                        <div class="d-flex justify-content-center gap-2">
+                                            <button class="btn btn-sm btn-outline-primary" title="แก้ไข" @onclick="() => OpenEditModal(i)">
+                                                <i class="bi bi-pencil-fill"></i>
+                                            </button>
+                                            @if (AuthService.CurrentUser?.Role == UserRole.Admin)
+                                            {
+                                                <button class="btn btn-sm btn-outline-danger" title="ลบ" @onclick="() => ConfirmDelete(i)">
+                                                    <i class="bi bi-trash-fill"></i>
+                                                </button>
+                                            }
+                                        </div>
+                                    </td>
+                                }
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-4">ไม่พบข้อมูลในคลังสินค้า</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else if (activeTab == "stockin")
+    {
+        <!-- Stock In History Search Panel -->
+        <div class="search-bar-panel">
+            <div class="search-input-wrapper">
+                <i class="bi bi-search"></i>
+                <input type="text" class="form-control-custom" placeholder="ค้นหาประวัติรับเข้าด้วยชื่อวัสดุ หรือผู้ทำรายการ..." @bind="stockInSearchQuery" @bind:event="oninput" @onkeyup="SearchStockIn" />
+            </div>
+            <button class="btn-custom btn-secondary-custom" @onclick="ClearStockInSearch">ล้างค่า</button>
+        </div>
+
+        <!-- Stock In Table -->
+        <div class="custom-table-container">
+            <table class="custom-table">
+                <thead>
+                    <tr>
+                        <th>รหัสรายการ</th>
+                        <th>ชื่อวัสดุ / อุปกรณ์</th>
+                        <th class="text-end">จำนวนที่รับเข้า</th>
+                        <th>หน่วยนับ</th>
+                        <th class="text-end">ราคาต่อหน่วย</th>
+                        <th class="text-end">ราคารวม</th>
+                        <th>วันที่รับเข้า</th>
+                        <th>ผู้รับสินค้า</th>
+                        <th>สถานะรายการ</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (filteredStockIns.Any())
+                    {
+                        @foreach (var s in filteredStockIns)
+                        {
+                            <tr>
+                                <td><strong>STK-@s.Id</strong></td>
+                                <td><strong>@s.Inventory?.Name</strong></td>
+                                <td class="text-end" style="font-weight: 600; color: var(--success);">+@s.Quantity.ToString("N1")</td>
+                                <td>@s.Inventory?.Unit</td>
+                                <td class="text-end">@s.UnitPrice.ToString("N2") บาท</td>
+                                <td class="text-end" style="font-weight: 600; color: var(--primary);">@s.TotalPrice.ToString("N2") บาท</td>
+                                <td>@s.ReceivedDate.ToString("dd/MM/yyyy HH:mm")</td>
+                                <td>@s.ReceivedBy</td>
+                                <td>
+                                    <span class="badge-status badge-@s.Status.ToString().ToLower()">
+                                        @GetStockInStatusText(s.Status)
+                                    </span>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="9" class="text-center text-muted py-4">ไม่มีประวัติการรับเข้าวัสดุ</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<!-- Modal Popup for Batch Add Materials -->
+@if (isBatchAddModalOpen)
+{
+    <div class="modal-overlay">
+        <div class="modal-content-custom" style="max-width: 900px; width: 95%;">
+            <div class="modal-header-custom">
+                <h3><i class="bi bi-plus-circle-fill" style="margin-right: 8px;"></i>เพิ่มวัสดุอุปกรณ์ใหม่ (หลายรายการ)</h3>
+                <button class="modal-close-btn" @onclick="CloseBatchAddModal">&times;</button>
+            </div>
+            <div>
+                <div class="modal-body-custom" style="max-height: 65vh; overflow-y: auto;">
+                    <div style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+                        <h4 style="margin: 0; font-size: 1rem; color: var(--text-primary); font-weight: 600;">
+                            <i class="bi bi-list-check" style="margin-right: 6px; color: var(--primary);"></i>
+                            รายการวัสดุอุปกรณ์ (@batchAddItems.Count รายการ)
+                        </h4>
+                        <button type="button" class="btn-custom btn-primary-custom" style="padding: 6px 14px; font-size: 0.85rem;" @onclick="AddBatchAddRow">
+                            <i class="bi bi-plus-circle"></i> เพิ่มรายการ
+                        </button>
+                    </div>
+
+                    @for (int i = 0; i < batchAddItems.Count; i++)
+                    {
+                        var idx = i;
+                        var item = batchAddItems[idx];
+                        <div style="
+                            background: rgba(255,255,255,0.03);
+                            border: 1px solid rgba(255,255,255,0.08);
+                            border-radius: 12px;
+                            padding: 16px;
+                            margin-bottom: 12px;
+                            position: relative;
+                            transition: all 0.2s ease;
+                        ">
+                            <!-- Row number badge -->
+                            <div style="
+                                position: absolute;
+                                top: -10px;
+                                left: 12px;
+                                background: var(--primary);
+                                color: white;
+                                font-size: 0.75rem;
+                                font-weight: 700;
+                                padding: 2px 10px;
+                                border-radius: 10px;
+                            ">
+                                #@(idx + 1)
+                            </div>
+
+                            <!-- Remove button -->
+                            @if (batchAddItems.Count > 1)
+                            {
+                                <button type="button" @onclick="() => RemoveBatchAddRow(idx)" style="
+                                    position: absolute;
+                                    top: 8px;
+                                    right: 8px;
+                                    background: rgba(239,68,68,0.15);
+                                    border: 1px solid rgba(239,68,68,0.3);
+                                    color: #ef4444;
+                                    width: 28px;
+                                    height: 28px;
+                                    border-radius: 8px;
+                                    cursor: pointer;
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: center;
+                                    font-size: 1rem;
+                                    transition: all 0.2s ease;
+                                " title="ลบรายการนี้">
+                                    <i class="bi bi-trash3"></i>
+                                </button>
+                            }
+
+                            <!-- Material name -->
+                            <div class="form-group" style="margin-top: 6px; margin-bottom: 10px;">
+                                <label class="form-label" style="font-size: 0.8rem;">ชื่อวัสดุ / อุปกรณ์ *</label>
+                                <input type="text" class="form-control-custom" @bind="item.Name" placeholder="เช่น Epoxy Resin, สีรองพื้น, ลูกกลิ้ง" />
+                            </div>
+
+                            <!-- Row: Quantity, Unit, Unit Price, Reorder Point -->
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px;">
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label class="form-label" style="font-size: 0.8rem;">จำนวนคงเหลือ *</label>
+                                    <input type="number" step="0.1" min="0" class="form-control-custom" @bind="item.Quantity" placeholder="0.0" />
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label class="form-label" style="font-size: 0.8rem;">หน่วยนับ *</label>
+                                    <input type="text" class="form-control-custom" @bind="item.Unit" placeholder="ชุด, แกลลอน" />
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label class="form-label" style="font-size: 0.8rem;">ราคาต่อหน่วย (บาท)</label>
+                                    <input type="number" step="0.01" min="0" class="form-control-custom" @bind="item.UnitPrice" placeholder="0.00" />
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label class="form-label" style="font-size: 0.8rem;">จุดสั่งซื้อขั้นต่ำ</label>
+                                    <input type="number" step="0.1" min="0" class="form-control-custom" @bind="item.ReorderPoint" placeholder="5.0" />
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrEmpty(batchAddErrorMessage))
+                    {
+                        <div style="
+                            background: rgba(239,68,68,0.1);
+                            border: 1px solid rgba(239,68,68,0.3);
+                            border-radius: 10px;
+                            padding: 10px 14px;
+                            margin-top: 12px;
+                            color: #ef4444;
+                            font-size: 0.9rem;
+                        ">
+                            <i class="bi bi-exclamation-triangle" style="margin-right: 6px;"></i>
+                            @batchAddErrorMessage
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer-custom">
+                    <button type="button" class="btn-custom btn-secondary-custom" @onclick="CloseBatchAddModal">ยกเลิก</button>
+                    <button type="button" class="btn-custom btn-primary-custom" @onclick="AddBatchAddRow" style="margin-right: auto;">
+                        <i class="bi bi-plus-circle"></i> เพิ่มรายการ
+                    </button>
+                    <button type="button" class="btn-custom btn-primary-custom" @onclick="SaveBatchAddInventory" style="background: linear-gradient(135deg, #22c55e, #16a34a);">
+                        <i class="bi bi-check2-all"></i> บันทึกทั้งหมด (@batchAddItems.Count รายการ)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Modal Popup for Edit Single Material -->
+@if (isEditModalOpen)
+{
+    <div class="modal-overlay">
+        <div class="modal-content-custom">
+            <div class="modal-header-custom">
+                <h3>แก้ไขรายละเอียดวัสดุ</h3>
+                <button class="modal-close-btn" @onclick="CloseEditModal">&times;</button>
+            </div>
+            <div>
+                <div class="modal-body-custom">
+                    <div class="form-group">
+                        <label class="form-label" for="edit-inv-name">ชื่อวัสดุ / อุปกรณ์ *</label>
+                        <input type="text" id="edit-inv-name" class="form-control-custom" @bind="editingItem.Name" required placeholder="ชื่อวัสดุ" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="edit-inv-qty">จำนวนคงเหลือปัจจุบัน *</label>
+                        <input type="number" step="0.1" id="edit-inv-qty" class="form-control-custom" @bind="editingItem.Quantity" required placeholder="ระบุจำนวนที่มีอยู่จริงในสต็อก" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="edit-inv-unit">หน่วยนับ *</label>
+                        <input type="text" id="edit-inv-unit" class="form-control-custom" @bind="editingItem.Unit" required placeholder="เช่น ชุด, แกลลอน, กิโลกรัม, ม้วน" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="edit-inv-price">ราคาต่อหน่วย (บาท)</label>
+                        <input type="number" step="0.01" min="0" id="edit-inv-price" class="form-control-custom" @bind="editingItem.UnitPrice" placeholder="ระบุราคาต่อหน่วยของวัสดุ" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="edit-inv-reorder">จุดสั่งซื้อขั้นต่ำ *</label>
+                        <input type="number" step="0.1" id="edit-inv-reorder" class="form-control-custom" @bind="editingItem.ReorderPoint" required placeholder="ระบบจะแจ้งเตือนเมื่อจำนวนเหลือน้อยกว่าค่านี้" />
+                    </div>
+                </div>
+                <div class="modal-footer-custom">
+                    <button type="button" class="btn-custom btn-secondary-custom" @onclick="CloseEditModal">ยกเลิก</button>
+                    <button type="button" class="btn-custom btn-primary-custom" @onclick="SaveEditInventory">บันทึกข้อมูล</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Delete Confirmation Modal -->
+@if (itemToDelete != null)
+{
+    <div class="modal-overlay">
+        <div class="modal-content-custom" style="max-width: 400px;">
+            <div class="modal-header-custom bg-danger">
+                <h3>ยืนยันการลบข้อมูล</h3>
+                <button class="modal-close-btn" @onclick="CancelDelete">&times;</button>
+            </div>
+            <div class="modal-body-custom text-center py-4">
+                <i class="bi bi-exclamation-triangle-fill text-danger mb-3" style="font-size: 3rem; display: block;"></i>
+                <p>คุณต้องการลบข้อมูลวัสดุ <strong>@itemToDelete.Name</strong> ใช่หรือไม่?</p>
+                <p class="text-danger small">การลบข้อมูลจะทำให้ข้อมูลรับเข้าวัสดุที่เกี่ยวข้องมีปัญหาการเชื่อมโยงข้อมูล</p>
+            </div>
+            <div class="modal-footer-custom">
+                <button type="button" class="btn-custom btn-secondary-custom" @onclick="CancelDelete">ยกเลิก</button>
+                <button type="button" class="btn-custom btn-danger" @onclick="DeleteInventory" style="background-color: var(--danger); color: white;">ลบข้อมูล</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Modal Popup for Batch StockIn Form -->
+@if (isStockInModalOpen)
+{
+    <div class="modal-overlay">
+        <div class="modal-content-custom" style="max-width: 960px; width: 95%;">
+            <div class="modal-header-custom">
+                <h3><i class="bi bi-journal-arrow-down" style="margin-right: 8px;"></i>บันทึกรับเข้าวัสดุ / อุปกรณ์ (หลายรายการ)</h3>
+                <button class="modal-close-btn" @onclick="CloseStockInModal">&times;</button>
+            </div>
+            <div>
+                <div class="modal-body-custom" style="max-height: 65vh; overflow-y: auto;">
+                    <!-- Shared fields -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label" for="batch-received-by">ผู้ทำรายการรับเข้า *</label>
+                            <input type="text" id="batch-received-by" class="form-control-custom" @bind="batchReceivedBy" required placeholder="ระบุชื่อผู้รับสินค้า" />
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label" for="batch-status">สถานะรายการ</label>
+                            <select id="batch-status" class="form-control-custom" @bind="batchStatus">
+                                <option value="Completed">Completed (เพิ่มยอดเข้าคลังทันที)</option>
+                                <option value="Pending">Pending (รอดำเนินการตรวจสอบ)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <hr style="border-color: rgba(255,255,255,0.1); margin: 0 0 16px 0;" />
+
+                    <!-- Batch item rows -->
+                    <div style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+                        <h4 style="margin: 0; font-size: 1rem; color: var(--text-primary); font-weight: 600;">
+                            <i class="bi bi-list-check" style="margin-right: 6px; color: var(--primary);"></i>
+                            รายการวัสดุ (@batchItems.Count รายการ)
+                        </h4>
+                        <button type="button" class="btn-custom btn-primary-custom" style="padding: 6px 14px; font-size: 0.85rem;" @onclick="AddBatchRow">
+                            <i class="bi bi-plus-circle"></i> เพิ่มรายการ
+                        </button>
+                    </div>
+
+                    @for (int i = 0; i < batchItems.Count; i++)
+                    {
+                        var idx = i;
+                        var item = batchItems[idx];
+                        <div class="batch-item-row" style="
+                            background: rgba(255,255,255,0.03);
+                            border: 1px solid rgba(255,255,255,0.08);
+                            border-radius: 12px;
+                            padding: 16px;
+                            margin-bottom: 12px;
+                            position: relative;
+                            transition: all 0.2s ease;
+                        ">
+                            <!-- Row number badge -->
+                            <div style="
+                                position: absolute;
+                                top: -10px;
+                                left: 12px;
+                                background: var(--primary);
+                                color: white;
+                                font-size: 0.75rem;
+                                font-weight: 700;
+                                padding: 2px 10px;
+                                border-radius: 10px;
+                            ">
+                                #@(idx + 1)
+                            </div>
+
+                            <!-- Remove button -->
+                            @if (batchItems.Count > 1)
+                            {
+                                <button type="button" @onclick="() => RemoveBatchRow(idx)" style="
+                                    position: absolute;
+                                    top: 8px;
+                                    right: 8px;
+                                    background: rgba(239,68,68,0.15);
+                                    border: 1px solid rgba(239,68,68,0.3);
+                                    color: #ef4444;
+                                    width: 28px;
+                                    height: 28px;
+                                    border-radius: 8px;
+                                    cursor: pointer;
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: center;
+                                    font-size: 1rem;
+                                    transition: all 0.2s ease;
+                                " title="ลบรายการนี้">
+                                    <i class="bi bi-trash3"></i>
+                                </button>
+                            }
+
+                            <!-- Row 1: Material combobox -->
+                            <div style="margin-top: 6px; margin-bottom: 10px; position: relative;">
+                                <label class="form-label" style="font-size: 0.8rem;">วัสดุ / อุปกรณ์ * <span style="font-size: 0.7rem; color: var(--text-secondary);">(พิมพ์ค้นหา หรือ พิมพ์ชื่อใหม่)</span></label>
+                                <div style="position: relative;">
+                                    <input type="text" class="form-control-custom"
+                                        value="@item.SearchText"
+                                        @oninput="(e) => OnStockInItemNameInput(idx, e)"
+                                        @onfocus="() => OnStockInItemNameFocus(idx)"
+                                        @onblur="() => OnStockInItemNameBlur(idx)"
+                                        autocomplete="off"
+                                        placeholder="พิมพ์ค้นหา เช่น Epoxy, สีรองพื้น... หรือพิมพ์ชื่อใหม่" />
+                                    @if (!string.IsNullOrWhiteSpace(item.SearchText))
+                                    {
+                                        <div style="
+                                            position: absolute;
+                                            right: 12px;
+                                            top: 50%;
+                                            transform: translateY(-50%);
+                                            font-size: 0.68rem;
+                                            padding: 2px 8px;
+                                            border-radius: 6px;
+                                            font-weight: 600;
+                                            pointer-events: none;
+                                            @(item.IsNewItem
+                                                ? "background: rgba(34,197,94,0.15); color: #22c55e; border: 1px solid rgba(34,197,94,0.3);"
+                                                : "background: rgba(99,102,241,0.15); color: #818cf8; border: 1px solid rgba(99,102,241,0.3);")
+                                        ">
+                                            @(item.IsNewItem ? "✨ รายการใหม่" : "📦 มีในคลัง")
+                                        </div>
+                                    }
+                                </div>
+                                <!-- Dropdown suggestions -->
+                                @if (item.ShowDropdown && item.Suggestions.Any())
+                                {
+                                    <div style="
+                                        position: absolute;
+                                        top: 100%;
+                                        left: 0;
+                                        right: 0;
+                                        z-index: 1000;
+                                        background: var(--card-bg, #1e1e2e);
+                                        border: 1px solid rgba(255,255,255,0.12);
+                                        border-radius: 10px;
+                                        box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+                                        max-height: 200px;
+                                        overflow-y: auto;
+                                        margin-top: 4px;
+                                    ">
+                                        <div style="padding: 6px 12px; font-size: 0.7rem; color: var(--text-secondary); border-bottom: 1px solid rgba(255,255,255,0.06); font-weight: 600;">
+                                            <i class="bi bi-box-seam" style="margin-right: 4px;"></i>
+                                            เลือกจากคลัง (@item.Suggestions.Count รายการ)
+                                        </div>
+                                        @foreach (var suggestion in item.Suggestions)
+                                        {
+                                            var sugItem = suggestion;
+                                            <div @onmousedown="() => SelectStockInSuggestion(idx, sugItem)" style="
+                                                padding: 8px 14px;
+                                                cursor: pointer;
+                                                transition: all 0.15s ease;
+                                                border-bottom: 1px solid rgba(255,255,255,0.04);
+                                                display: flex;
+                                                justify-content: space-between;
+                                                align-items: center;
+                                            " onmouseover="this.style.background='rgba(99,102,241,0.12)'" onmouseout="this.style.background='transparent'">
+                                                <div>
+                                                    <div style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary);">@sugItem.Name</div>
+                                                    <div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 1px;">
+                                                        คงเหลือ: @sugItem.Quantity.ToString("N1") @sugItem.Unit
+                                                        @if (sugItem.UnitPrice > 0)
+                                                        {
+                                                            <span style="margin-left: 6px;">| ราคา: @sugItem.UnitPrice.ToString("N2") บาท</span>
+                                                        }
+                                                    </div>
+                                                </div>
+                                                <i class="bi bi-arrow-return-left" style="color: var(--text-secondary); font-size: 0.75rem;"></i>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+
+                            <!-- Row 2: New item fields (only show if new item) -->
+                            @if (item.IsNewItem)
+                            {
+                                <div style="
+                                    background: rgba(34,197,94,0.06);
+                                    border: 1px dashed rgba(34,197,94,0.25);
+                                    border-radius: 8px;
+                                    padding: 10px 12px;
+                                    margin-bottom: 10px;
+                                    display: grid;
+                                    grid-template-columns: 1fr 1fr;
+                                    gap: 10px;
+                                ">
+                                    <div class="form-group" style="margin-bottom: 0;">
+                                        <label class="form-label" style="font-size: 0.75rem; color: #22c55e;">
+                                            <i class="bi bi-tag" style="margin-right: 4px;"></i>หน่วยนับ *
+                                        </label>
+                                        <input type="text" class="form-control-custom" @bind="item.NewItemUnit"
+                                            placeholder="เช่น ชุด, แกลลอน, กก., ม้วน" style="font-size: 0.88rem;" />
+                                    </div>
+                                    <div class="form-group" style="margin-bottom: 0;">
+                                        <label class="form-label" style="font-size: 0.75rem; color: #22c55e;">
+                                            <i class="bi bi-bell" style="margin-right: 4px;"></i>จุดสั่งซื้อขั้นต่ำ
+                                        </label>
+                                        <input type="number" step="0.1" min="0" class="form-control-custom" @bind="item.NewItemReorderPoint"
+                                            placeholder="จำนวนขั้นต่ำ" style="font-size: 0.88rem;" />
+                                    </div>
+                                </div>
+                            }
+
+                            <!-- Row 3: Quantity, Price, Total -->
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
+                                <!-- Quantity -->
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label class="form-label" style="font-size: 0.8rem;">จำนวน *</label>
+                                    <input type="number" step="0.1" min="0.1" class="form-control-custom" @bind="item.Quantity" placeholder="0.0" />
+                                </div>
+
+                                <!-- Unit Price -->
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label class="form-label" style="font-size: 0.8rem;">ราคาต่อหน่วย (บาท)</label>
+                                    <input type="number" step="0.01" min="0" class="form-control-custom" @bind="item.UnitPrice" placeholder="0.00" />
+                                </div>
+
+                                <!-- Computed total -->
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label class="form-label" style="font-size: 0.8rem;">ราคารวม</label>
+                                    <div style="
+                                        background: rgba(34,197,94,0.1);
+                                        border: 1px solid rgba(34,197,94,0.25);
+                                        border-radius: 10px;
+                                        padding: 10px 14px;
+                                        font-weight: 700;
+                                        color: #22c55e;
+                                        font-size: 0.95rem;
+                                        text-align: right;
+                                        min-height: 42px;
+                                        display: flex;
+                                        align-items: center;
+                                        justify-content: flex-end;
+                                    ">
+                                        @((item.Quantity * item.UnitPrice).ToString("N2")) บาท
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    <!-- Grand total -->
+                    <div style="
+                        background: linear-gradient(135deg, rgba(99,102,241,0.12), rgba(168,85,247,0.12));
+                        border: 1px solid rgba(99,102,241,0.25);
+                        border-radius: 14px;
+                        padding: 16px 20px;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        margin-top: 8px;
+                    ">
+                        <span style="font-weight: 600; color: var(--text-secondary); font-size: 0.95rem;">
+                            <i class="bi bi-calculator" style="margin-right: 6px;"></i>
+                            ยอดรวมทั้งหมด (@batchItems.Count รายการ)
+                        </span>
+                        <span style="font-size: 1.3rem; font-weight: 800; color: var(--primary);">
+                            @GetStockInGrandTotal().ToString("N2") บาท
+                        </span>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(stockInErrorMessage))
+                    {
+                        <div style="
+                            background: rgba(239,68,68,0.1);
+                            border: 1px solid rgba(239,68,68,0.3);
+                            border-radius: 10px;
+                            padding: 10px 14px;
+                            margin-top: 12px;
+                            color: #ef4444;
+                            font-size: 0.9rem;
+                        ">
+                            <i class="bi bi-exclamation-triangle" style="margin-right: 6px;"></i>
+                            @stockInErrorMessage
+                        </div>
+                    }
+                </div>
+
+                <div class="modal-footer-custom">
+                    <button type="button" class="btn-custom btn-secondary-custom" @onclick="CloseStockInModal">ยกเลิก</button>
+                    <button type="button" class="btn-custom btn-primary-custom" @onclick="AddBatchRow" style="margin-right: auto;">
+                        <i class="bi bi-plus-circle"></i> เพิ่มรายการ
+                    </button>
+                    <button type="button" class="btn-custom btn-primary-custom" @onclick="SaveBatchStockIn" style="background: linear-gradient(135deg, #22c55e, #16a34a);">
+                        <i class="bi bi-check2-all"></i> บันทึกทั้งหมด (@batchItems.Count รายการ)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private string activeTab = "inventory";
+
+    // --- Tab 1: Inventory states ---
+    private List<Inventory> inventories = new();
+    private List<Inventory> filteredInventories = new();
+    private string searchQuery = string.Empty;
+    private string filterStockLevel = string.Empty;
+
+    // Batch Add Material Modal states
+    private bool isBatchAddModalOpen = false;
+    private List<BatchAddInventoryItem> batchAddItems = new();
+    private string batchAddErrorMessage = string.Empty;
+
+    // Edit Material Modal states
+    private bool isEditModalOpen = false;
+    private Inventory editingItem = new();
+
+    // Delete state
+    private Inventory? itemToDelete = null;
+
+    private class BatchAddInventoryItem
+    {
+        public string Name { get; set; } = string.Empty;
+        public decimal Quantity { get; set; }
+        public string Unit { get; set; } = string.Empty;
+        public decimal UnitPrice { get; set; }
+        public decimal ReorderPoint { get; set; } = 5;
+    }
+
+    // --- Tab 2: Stock-In states ---
+    private List<StockIn> stockIns = new();
+    private List<StockIn> filteredStockIns = new();
+    private string stockInSearchQuery = string.Empty;
+
+    // Batch Stock In Modal states
+    private bool isStockInModalOpen = false;
+    private string batchReceivedBy = string.Empty;
+    private StockInStatus batchStatus = StockInStatus.Completed;
+    private List<BatchStockInItem> batchItems = new();
+    private string stockInErrorMessage = string.Empty;
+
+    private class BatchStockInItem
+    {
+        public int InventoryId { get; set; }
+        public string SearchText { get; set; } = string.Empty;
+        public decimal Quantity { get; set; }
+        public decimal UnitPrice { get; set; }
+        public bool IsNewItem { get; set; }
+        public string NewItemUnit { get; set; } = string.Empty;
+        public decimal NewItemReorderPoint { get; set; } = 5;
+        public bool ShowDropdown { get; set; }
+        public List<Inventory> Suggestions { get; set; } = new();
+    }
+
+    protected override void OnInitialized()
+    {
+        DetermineActiveTab();
+        LoadData();
+    }
+
+    protected override void OnParametersSet()
+    {
+        DetermineActiveTab();
+    }
+
+    private void DetermineActiveTab()
+    {
+        var uri = NavigationManager.Uri;
+        if (uri.Contains("/stockin", StringComparison.OrdinalIgnoreCase))
+        {
+            activeTab = "stockin";
+        }
+        else
+        {
+            activeTab = "inventory";
+        }
+    }
+
+    private void SetTab(string tab)
+    {
+        activeTab = tab;
+        if (tab == "stockin")
+        {
+            NavigationManager.NavigateTo("/stockin", false);
+        }
+        else
+        {
+            NavigationManager.NavigateTo("/inventory", false);
+        }
+    }
+
+    private void LoadData()
+    {
+        LoadInventory();
+        LoadStockInHistory();
+    }
+
+    // --- Tab 1: Inventory logic ---
+    private void LoadInventory()
+    {
+        inventories = Db.Inventories.OrderByDescending(i => i.Id).ToList();
+        Search();
+    }
+
+    private void Search()
+    {
+        if (string.IsNullOrWhiteSpace(searchQuery))
+        {
+            filteredInventories = inventories;
+        }
+        else
+        {
+            var q = searchQuery.ToLower();
+            filteredInventories = inventories
+                .Where(i => i.Name.ToLower().Contains(q))
+                .ToList();
+        }
+
+        if (!string.IsNullOrEmpty(filterStockLevel))
+        {
+            if (filterStockLevel == "Low")
+            {
+                filteredInventories = filteredInventories.Where(i => i.IsLowStock).ToList();
+            }
+            else if (filterStockLevel == "OK")
+            {
+                filteredInventories = filteredInventories.Where(i => !i.IsLowStock).ToList();
+            }
+        }
+    }
+
+    private void ClearSearch()
+    {
+        searchQuery = string.Empty;
+        filterStockLevel = string.Empty;
+        Search();
+    }
+
+    // --- Batch Add Modal methods ---
+    private void OpenAddModal()
+    {
+        batchAddErrorMessage = string.Empty;
+        batchAddItems = new List<BatchAddInventoryItem>
+        {
+            new BatchAddInventoryItem()
+        };
+        isBatchAddModalOpen = true;
+    }
+
+    private void CloseBatchAddModal()
+    {
+        isBatchAddModalOpen = false;
+        batchAddErrorMessage = string.Empty;
+    }
+
+    private void AddBatchAddRow()
+    {
+        batchAddItems.Add(new BatchAddInventoryItem());
+    }
+
+    private void RemoveBatchAddRow(int index)
+    {
+        if (batchAddItems.Count > 1)
+        {
+            batchAddItems.RemoveAt(index);
+        }
+    }
+
+    private void SaveBatchAddInventory()
+    {
+        batchAddErrorMessage = string.Empty;
+
+        for (int i = 0; i < batchAddItems.Count; i++)
+        {
+            var item = batchAddItems[i];
+            if (string.IsNullOrWhiteSpace(item.Name))
+            {
+                batchAddErrorMessage = $"รายการที่ #{i + 1}: กรุณาระบุชื่อวัสดุ / อุปกรณ์";
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(item.Unit))
+            {
+                batchAddErrorMessage = $"รายการที่ #{i + 1}: กรุณาระบุหน่วยนับ";
+                return;
+            }
+            if (item.Quantity < 0)
+            {
+                batchAddErrorMessage = $"รายการที่ #{i + 1}: จำนวนต้องไม่ติดลบ";
+                return;
+            }
+        }
+
+        foreach (var item in batchAddItems)
+        {
+            var newInv = new Inventory
+            {
+                Name = item.Name.Trim(),
+                Quantity = item.Quantity,
+                Unit = item.Unit.Trim(),
+                UnitPrice = item.UnitPrice,
+                ReorderPoint = item.ReorderPoint
+            };
+            Db.Inventories.Add(newInv);
+        }
+
+        Db.SaveChanges();
+        isBatchAddModalOpen = false;
+        batchAddErrorMessage = string.Empty;
+        LoadInventory();
+    }
+
+    // --- Edit Modal methods ---
+    private void OpenEditModal(Inventory item)
+    {
+        editingItem = new Inventory
+        {
+            Id = item.Id,
+            Name = item.Name,
+            Quantity = item.Quantity,
+            Unit = item.Unit,
+            UnitPrice = item.UnitPrice,
+            ReorderPoint = item.ReorderPoint
+        };
+        isEditModalOpen = true;
+    }
+
+    private void CloseEditModal()
+    {
+        isEditModalOpen = false;
+    }
+
+    private void SaveEditInventory()
+    {
+        var existing = Db.Inventories.Find(editingItem.Id);
+        if (existing != null)
+        {
+            existing.Name = editingItem.Name;
+            existing.Quantity = editingItem.Quantity;
+            existing.Unit = editingItem.Unit;
+            existing.UnitPrice = editingItem.UnitPrice;
+            existing.ReorderPoint = editingItem.ReorderPoint;
+            Db.Inventories.Update(existing);
+        }
+        Db.SaveChanges();
+        isEditModalOpen = false;
+        LoadInventory();
+    }
+
+    private void ConfirmDelete(Inventory item)
+    {
+        itemToDelete = item;
+    }
+
+    private void CancelDelete()
+    {
+        itemToDelete = null;
+    }
+
+    private void DeleteInventory()
+    {
+        if (itemToDelete != null)
+        {
+            Db.Inventories.Remove(itemToDelete);
+            Db.SaveChanges();
+            itemToDelete = null;
+            LoadInventory();
+        }
+    }
+
+    // --- Tab 2: Stock-In logic ---
+    private void LoadStockInHistory()
+    {
+        stockIns = Db.StockIns
+            .Include(s => s.Inventory)
+            .OrderByDescending(s => s.Id)
+            .ToList();
+        SearchStockIn();
+    }
+
+    private void SearchStockIn()
+    {
+        if (string.IsNullOrWhiteSpace(stockInSearchQuery))
+        {
+            filteredStockIns = stockIns;
+        }
+        else
+        {
+            var q = stockInSearchQuery.ToLower();
+            filteredStockIns = stockIns
+                .Where(s => (s.Inventory != null && s.Inventory.Name.ToLower().Contains(q)) || 
+                            s.ReceivedBy.ToLower().Contains(q))
+                .ToList();
+        }
+    }
+
+    private void ClearStockInSearch()
+    {
+        stockInSearchQuery = string.Empty;
+        SearchStockIn();
+    }
+
+    private void OpenAddStockInModal()
+    {
+        batchReceivedBy = AuthService.CurrentUser?.FullName ?? string.Empty;
+        batchStatus = StockInStatus.Completed;
+        stockInErrorMessage = string.Empty;
+        batchItems = new List<BatchStockInItem>
+        {
+            new BatchStockInItem()
+        };
+        isStockInModalOpen = true;
+    }
+
+    private void CloseStockInModal()
+    {
+        isStockInModalOpen = false;
+        stockInErrorMessage = string.Empty;
+    }
+
+    private void AddBatchRow()
+    {
+        batchItems.Add(new BatchStockInItem());
+    }
+
+    private void RemoveBatchRow(int index)
+    {
+        if (batchItems.Count > 1)
+        {
+            batchItems.RemoveAt(index);
+        }
+    }
+
+    private void OnStockInItemNameInput(int index, ChangeEventArgs e)
+    {
+        var item = batchItems[index];
+        item.SearchText = e.Value?.ToString() ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(item.SearchText))
+        {
+            item.Suggestions = new();
+            item.ShowDropdown = false;
+            item.InventoryId = 0;
+            item.IsNewItem = false;
+        }
+        else
+        {
+            var q = item.SearchText.ToLower();
+            item.Suggestions = inventories
+                .Where(inv => inv.Name.ToLower().Contains(q))
+                .Take(8)
+                .ToList();
+            item.ShowDropdown = true;
+
+            var exactMatch = inventories.FirstOrDefault(inv =>
+                inv.Name.Equals(item.SearchText, StringComparison.OrdinalIgnoreCase));
+            if (exactMatch != null)
+            {
+                item.InventoryId = exactMatch.Id;
+                item.IsNewItem = false;
+            }
+            else
+            {
+                item.InventoryId = 0;
+                item.IsNewItem = true;
+            }
+        }
+    }
+
+    private void OnStockInItemNameFocus(int index)
+    {
+        var item = batchItems[index];
+        if (!string.IsNullOrWhiteSpace(item.SearchText))
+        {
+            var q = item.SearchText.ToLower();
+            item.Suggestions = inventories
+                .Where(inv => inv.Name.ToLower().Contains(q))
+                .Take(8)
+                .ToList();
+        }
+        else
+        {
+            item.Suggestions = inventories.Take(8).ToList();
+        }
+        item.ShowDropdown = item.Suggestions.Any();
+    }
+
+    private void OnStockInItemNameBlur(int index)
+    {
+        var item = batchItems[index];
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(200);
+            item.ShowDropdown = false;
+            await InvokeAsync(StateHasChanged);
+        });
+    }
+
+    private void SelectStockInSuggestion(int index, Inventory inv)
+    {
+        var item = batchItems[index];
+        item.SearchText = inv.Name;
+        item.InventoryId = inv.Id;
+        item.IsNewItem = false;
+        item.ShowDropdown = false;
+
+        if (item.UnitPrice == 0 && inv.UnitPrice > 0)
+        {
+            item.UnitPrice = inv.UnitPrice;
+        }
+    }
+
+    private decimal GetStockInGrandTotal()
+    {
+        return batchItems.Sum(item => item.Quantity * item.UnitPrice);
+    }
+
+    private void SaveBatchStockIn()
+    {
+        stockInErrorMessage = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(batchReceivedBy))
+        {
+            stockInErrorMessage = "กรุณาระบุชื่อผู้ทำรายการรับเข้า";
+            return;
+        }
+
+        for (int i = 0; i < batchItems.Count; i++)
+        {
+            var item = batchItems[i];
+            if (string.IsNullOrWhiteSpace(item.SearchText))
+            {
+                stockInErrorMessage = $"รายการที่ #{i + 1}: กรุณาระบุชื่อวัสดุ / อุปกรณ์";
+                return;
+            }
+            if (item.IsNewItem && string.IsNullOrWhiteSpace(item.NewItemUnit))
+            {
+                stockInErrorMessage = $"รายการที่ #{i + 1}: กรุณาระบุหน่วยนับสำหรับวัสดุใหม่ \"{item.SearchText}\"";
+                return;
+            }
+            if (item.Quantity <= 0)
+            {
+                stockInErrorMessage = $"รายการที่ #{i + 1}: กรุณาระบุจำนวนที่รับเข้า (มากกว่า 0)";
+                return;
+            }
+            if (item.UnitPrice < 0)
+            {
+                stockInErrorMessage = $"รายการที่ #{i + 1}: ราคาต่อหน่วยต้องไม่ติดลบ";
+                return;
+            }
+        }
+
+        var now = DateTime.Now;
+        foreach (var item in batchItems)
+        {
+            int inventoryId = item.InventoryId;
+
+            if (item.IsNewItem)
+            {
+                var newInv = new Inventory
+                {
+                    Name = item.SearchText.Trim(),
+                    Quantity = 0,
+                    Unit = item.NewItemUnit.Trim(),
+                    UnitPrice = item.UnitPrice,
+                    ReorderPoint = item.NewItemReorderPoint
+                };
+                Db.Inventories.Add(newInv);
+                Db.SaveChanges();
+                inventoryId = newInv.Id;
+            }
+
+            var stockIn = new StockIn
+            {
+                InventoryId = inventoryId,
+                Quantity = item.Quantity,
+                UnitPrice = item.UnitPrice,
+                ReceivedDate = now,
+                ReceivedBy = batchReceivedBy,
+                Status = batchStatus
+            };
+
+            if (batchStatus == StockInStatus.Completed)
+            {
+                var inventory = Db.Inventories.Find(inventoryId);
+                if (inventory != null)
+                {
+                    inventory.Quantity += item.Quantity;
+                    if (item.UnitPrice > 0)
+                    {
+                        inventory.UnitPrice = item.UnitPrice;
+                    }
+                    Db.Inventories.Update(inventory);
+                }
+            }
+
+            Db.StockIns.Add(stockIn);
+        }
+
+        Db.SaveChanges();
+        isStockInModalOpen = false;
+        stockInErrorMessage = string.Empty;
+        
+        LoadData();
+    }
+
+    private string GetStockInStatusText(StockInStatus status) => status switch
+    {
+        StockInStatus.Completed => "เสร็จสมบูรณ์",
+        StockInStatus.Pending => "รอดำเนินการ",
+        _ => ""
+    };
+}

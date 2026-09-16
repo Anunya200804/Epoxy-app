@@ -1,0 +1,118 @@
+@page "/login"
+@layout LoginLayout
+@inject EpoxyDbContext Db
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+
+<div class="login-card">
+    <div class="login-logo text-center mb-3">
+        <img src="images/logo.png" alt="Company Logo" style="height: 80px; width: 80px; object-fit: cover; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.25); border: 2px solid rgba(255,255,255,0.2);" />
+    </div>
+    <h2 class="login-title">เข้าสู่ระบบ</h2>
+    <p class="login-subtitle">จัดการพื้น Epoxy ช่างแขก</p>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger" role="alert">
+            <i class="bi bi-exclamation-triangle-fill"></i> @errorMessage
+        </div>
+    }
+
+    <div class="form-group">
+        <label class="form-label" for="login-username">ชื่อผู้ใช้งาน</label>
+        <div class="search-input-wrapper" style="margin-bottom: 0;">
+            <i class="bi bi-person-fill"></i>
+            <input type="text" id="login-username" class="form-control-custom"
+                   placeholder="กรอกชื่อผู้ใช้งาน"
+                   @bind="username"
+                   @bind:event="oninput"
+                   @onkeydown="HandleKeyDown" />
+        </div>
+        <div class="form-text" style="font-size: 0.78rem; margin-top: 6px; color: rgba(255,255,255,0.6);">
+            บัญชีสาธิต: <strong>admin</strong> / <strong>pm</strong> / <strong>staff</strong>
+        </div>
+    </div>
+
+    <div class="form-group" style="margin-bottom: 24px;">
+        <label class="form-label" for="login-password">รหัสผ่าน</label>
+        <div class="search-input-wrapper" style="margin-bottom: 0;">
+            <i class="bi bi-lock-fill"></i>
+            <input type="password" id="login-password" class="form-control-custom"
+                   placeholder="กรอกรหัสผ่าน"
+                   @bind="password"
+                   @bind:event="oninput"
+                   @onkeydown="HandleKeyDown" />
+        </div>
+        <div class="form-text" style="font-size: 0.78rem; margin-top: 6px; color: rgba(255,255,255,0.6);">
+            รหัสผ่าน: <strong>admin123</strong> / <strong>pm123</strong> / <strong>staff123</strong>
+        </div>
+    </div>
+
+    <button type="button" class="btn-custom btn-primary-custom w-100 justify-content-center"
+            @onclick="HandleLogin" disabled="@isLoading">
+        @if (isLoading)
+        {
+            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+            <span>กำลังเข้าสู่ระบบ...</span>
+        }
+        else
+        {
+            <i class="bi bi-box-arrow-in-right"></i>
+            <span> เข้าสู่ระบบ</span>
+        }
+    </button>
+</div>
+
+@code {
+    private string username = string.Empty;
+    private string password = string.Empty;
+    private string errorMessage = string.Empty;
+    private bool isLoading = false;
+
+    protected override void OnInitialized()
+    {
+        if (AuthService.IsLoggedIn)
+        {
+            NavigationManager.NavigateTo("/");
+        }
+    }
+
+    private void HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            HandleLogin();
+        }
+    }
+
+    private void HandleLogin()
+    {
+        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+        {
+            errorMessage = "กรุณากรอกชื่อผู้ใช้งานและรหัสผ่าน";
+            return;
+        }
+
+        errorMessage = string.Empty;
+        isLoading = true;
+
+        try
+        {
+            var user = Db.Users.FirstOrDefault(u => u.Username.ToLower() == username.Trim().ToLower());
+            if (user == null || user.PasswordHash != password.Trim())
+            {
+                errorMessage = "ชื่อผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง";
+                isLoading = false;
+                return;
+            }
+
+            AuthService.Login(user);
+            NavigationManager.NavigateTo("/");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "เกิดข้อผิดพลาด: " + ex.Message;
+            isLoading = false;
+        }
+    }
+}

@@ -1,0 +1,1063 @@
+@page "/quotations"
+@inject EpoxyDbContext Db
+@inject AuthService AuthService
+@inject EpoxyFloorManager.Services.PricingService PricingService
+@inject IJSRuntime JS
+
+<PageTitle>ใบเสนอราคา - ระบบการจัดการพื้น Epoxy</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4 no-print">
+    <div>
+        <h2 class="mb-1" style="font-weight: 700; color: var(--primary);">ระบบใบเสนอราคา</h2>
+        <p class="text-muted mb-0">สร้าง ออกแบบ ใบเสนอราคา คำนวณเงินมัดจำ และติดตามสถานะความพึงพอใจของลูกค้า</p>
+    </div>
+    @if (AuthService.CurrentUser?.Role == UserRole.Admin || AuthService.CurrentUser?.Role == UserRole.ProjectManager)
+    {
+        <button class="btn-custom btn-primary-custom" @onclick="OpenAddModal">
+            <i class="bi bi-file-earmark-plus-fill"></i> สร้างใบเสนอราคาใหม่
+        </button>
+    }
+</div>
+
+<!-- Quotations List -->
+<div class="card-panel no-print">
+    <div class="custom-table-container">
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th style="white-space: nowrap;">เลขที่ใบเสนอราคา</th>
+                    <th>ลูกค้า</th>
+                    <th>รายละเอียดงาน</th>
+                    <th class="text-end">พื้นที่ (ตร.ม.)</th>
+                    <th class="text-end">ราคา/หน่วย</th>
+                    <th class="text-end">ยอดรวม</th>
+                    <th class="text-end">มัดจำ</th>
+                    <th class="text-end">ยอดค้างชำระ</th>
+                    <th>สลิปโอนเงิน</th>
+                    <th>สถานะ</th>
+                    <th class="text-center">จัดการ</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (quotations.Any())
+                {
+                    @foreach (var q in quotations)
+                    {
+                        <tr>
+                            <td style="white-space: nowrap;"><strong>QT-@q.Id</strong></td>
+                            <td>@q.Customer?.Name</td>
+                            <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@q.JobDescription</td>
+                            <td class="text-end">@q.AreaSqm.ToString("N0")</td>
+                            <td class="text-end">฿@q.PricePerUnit.ToString("N0")</td>
+                            <td class="text-end" style="font-weight: 600;">฿@q.TotalPrice.ToString("N0")</td>
+                            <td class="text-end" style="color: var(--success);">฿@q.DepositAmount.ToString("N0")</td>
+                            <td class="text-end" style="color: var(--secondary);">฿@q.BalanceAmount.ToString("N0")</td>
+                            <td>
+                                @if (!string.IsNullOrEmpty(q.PaymentSlipUrl))
+                                {
+                                    <button class="btn btn-sm btn-outline-success d-flex align-items-center gap-1" style="font-size: 0.78rem; padding: 2px 8px; border-radius: 6px;" @onclick="() => OpenSlipModal(q)" title="คลิกเพื่อดูรูปภาพสลิป">
+                                        <i class="bi bi-receipt-cutoff"></i> ดูสลิป
+                                    </button>
+                                }
+                                else if (q.Status == QuotationStatus.Approved)
+                                {
+                                    <span class="text-muted" style="font-size: 0.78rem;">ไม่มีสลิป</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted" style="font-size: 0.78rem;">รอชำระ</span>
+                                }
+                            </td>
+                            <td>
+                                <span class="badge-status badge-@q.Status.ToString().ToLower()">
+                                    @GetStatusName(q.Status)
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                <div class="d-flex justify-content-center gap-1">
+                                    <button class="btn btn-sm btn-outline-secondary" title="พิมพ์" @onclick="() => OpenPrintPreview(q)">
+                                        <i class="bi bi-file-earmark-pdf-fill text-danger"></i>
+                                    </button>
+                                    @if (AuthService.CurrentUser?.Role == UserRole.Admin || AuthService.CurrentUser?.Role == UserRole.ProjectManager)
+                                    {
+                                        <button class="btn btn-sm btn-outline-primary" title="แก้ไขข้อมูลใบเสนอราคา" @onclick="() => OpenEditModal(q)">
+                                            <i class="bi bi-pencil-fill"></i>
+                                        </button>
+                                        @if (q.Status == QuotationStatus.Draft)
+                                        {
+                                            <button class="btn btn-sm btn-outline-success" title="ยืนยันการชำระเงินและอนุมัติใบเสนอราคา" @onclick="() => OpenApproveModal(q)">
+                                                <i class="bi bi-check-circle-fill"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-danger" title="ยกเลิกใบเสนอราคา" @onclick="() => CancelQuotation(q)">
+                                                <i class="bi bi-x-circle-fill"></i>
+                                            </button>
+                                        }
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="11" class="text-center text-muted py-4">ยังไม่มีการบันทึกใบเสนอราคาในระบบ</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal Popup for Add/Edit Quotation -->
+@if (isModalOpen)
+{
+    <div class="modal-overlay no-print">
+        <div class="modal-content-custom" style="max-width: 700px;">
+            <div class="modal-header-custom">
+                <h3>@(newQuotation.Id == 0 ? "สร้างใบเสนอราคาใหม่" : $"แก้ไขใบเสนอราคา QT-{newQuotation.Id}")</h3>
+                <button class="modal-close-btn" @onclick="CloseModal">&times;</button>
+            </div>
+            <div>
+                <div class="modal-body-custom" style="max-height: 70vh; overflow-y: auto;">
+                    
+                    <!-- Customer selection (Combobox) -->
+                    <div class="form-group" style="position: relative;">
+                        <label class="form-label">เลือกลูกค้า * <span style="font-size: 0.75rem; color: var(--text-secondary);">(พิมพ์ค้นหา หรือ พิมพ์ชื่อลูกค้าใหม่)</span></label>
+                        <div style="position: relative;">
+                            <input type="text" class="form-control-custom"
+                                   value="@customerSearchText"
+                                   @oninput="OnCustomerInput"
+                                   @onfocus="OnCustomerFocus"
+                                   @onblur="OnCustomerBlur"
+                                   autocomplete="off"
+                                   placeholder="พิมพ์ค้นหา หรือ กรอกชื่อลูกค้าคนใหม่..." />
+                            @if (!string.IsNullOrWhiteSpace(customerSearchText))
+                            {
+                                <div style="
+                                    position: absolute;
+                                    right: 12px;
+                                    top: 50%;
+                                    transform: translateY(-50%);
+                                    font-size: 0.7rem;
+                                    padding: 2px 8px;
+                                    border-radius: 6px;
+                                    font-weight: 600;
+                                    pointer-events: none;
+                                    @(isNewCustomer 
+                                        ? "background: rgba(34,197,94,0.15); color: #22c55e; border: 1px solid rgba(34,197,94,0.3);" 
+                                        : "background: rgba(99,102,241,0.15); color: #818cf8; border: 1px solid rgba(99,102,241,0.3);")
+                                ">
+                                    @(isNewCustomer ? "✨ ลูกค้าใหม่" : "📦 ลูกค้าเก่า")
+                                </div>
+                            }
+                        </div>
+
+                        <!-- Dropdown suggestions -->
+                        @if (showCustomerDropdown && customerSuggestions.Any())
+                        {
+                            <div style="
+                                position: absolute;
+                                top: 100%;
+                                left: 0;
+                                right: 0;
+                                z-index: 1000;
+                                background: #ffffff;
+                                border: 1px solid rgba(0, 0, 0, 0.15);
+                                border-radius: 8px;
+                                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+                                max-height: 200px;
+                                overflow-y: auto;
+                                margin-top: 4px;
+                            ">
+                                <div style="padding: 8px 14px; font-size: 0.75rem; color: #475569; border-bottom: 1px solid rgba(0, 0, 0, 0.08); font-weight: 600; background: #f8fafc;">
+                                    <i class="bi bi-person-lines-fill" style="margin-right: 6px; color: var(--primary);"></i>
+                                    เลือกลูกค้าเดิมที่มีอยู่
+                                </div>
+                                @foreach (var cust in customerSuggestions)
+                                {
+                                    var currentCust = cust;
+                                    <div @onmousedown="() => SelectCustomer(currentCust)" style="
+                                        padding: 10px 14px;
+                                        cursor: pointer;
+                                        transition: all 0.15s ease;
+                                        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+                                        display: flex;
+                                        justify-content: space-between;
+                                        align-items: center;
+                                    " onmouseover="this.style.background='rgba(59, 130, 246, 0.08)'" onmouseout="this.style.background='transparent'">
+                                        <div>
+                                            <div style="font-weight: 600; font-size: 0.9rem; color: #0f172a;">@currentCust.Name</div>
+                                            <div style="font-size: 0.78rem; color: #475569; margin-top: 2px;">
+                                                โทร: @currentCust.Phone
+                                            </div>
+                                        </div>
+                                        <i class="bi bi-arrow-return-left" style="color: #94a3b8; font-size: 0.82rem;"></i>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    <!-- New customer fields (only show if it's a new customer) -->
+                    @if (isNewCustomer && !string.IsNullOrWhiteSpace(customerSearchText))
+                    {
+                        <div style="
+                            background: rgba(34,197,94,0.05);
+                            border: 1px dashed rgba(34,197,94,0.3);
+                            border-radius: 12px;
+                            padding: 16px;
+                            margin-bottom: 16px;
+                        ">
+                            <h4 style="margin-top: 0; margin-bottom: 12px; font-size: 0.9rem; color: #22c55e; font-weight: 700;">
+                                <i class="bi bi-person-plus-fill" style="margin-right: 6px;"></i> ข้อมูลลูกค้าใหม่
+                            </h4>
+                            <div class="row" style="display: flex; gap: 12px; margin-bottom: 12px;">
+                                <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                                    <label class="form-label" style="color: #22c55e; font-size: 0.78rem;">เบอร์โทรศัพท์ *</label>
+                                    <input type="text" class="form-control-custom" @bind="newCustomerPhone" placeholder="กรอกเบอร์โทรศัพท์ลูกค้า" required />
+                                </div>
+                                <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                                    <label class="form-label" style="color: #22c55e; font-size: 0.78rem;">ไลน์ไอดี</label>
+                                    <input type="text" class="form-control-custom" @bind="newCustomerLineId" placeholder="กรอกไลน์ไอดี (ถ้ามี)" />
+                                </div>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label" style="color: #22c55e; font-size: 0.78rem;">ที่อยู่ติดตั้ง / ส่งเอกสาร *</label>
+                                <textarea class="form-control-custom" rows="2" @bind="newCustomerAddress" placeholder="กรอกที่อยู่ของลูกค้าอย่างละเอียด" required></textarea>
+                            </div>
+                        </div>
+                    }
+
+                    <!-- 1. Floor Type & Area -->
+                    <div class="row" style="display: flex; gap: 12px; margin-bottom: 12px;">
+                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                            <label class="form-label">ประเภทพื้น *</label>
+                            <select class="form-control-custom" @bind="selectedFloorType" @bind:after="OnFloorTypeOrAreaChanged">
+                                <option value="Epoxy Coating">Epoxy Coating (อีพ็อกซี่เคลือบ)</option>
+                                <option value="Epoxy Self-Leveling">Epoxy Self-Leveling (อีพ็อกซี่เทราบ)</option>
+                                <option value="PU">PU (พอลิยูรีเทน)</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                            <label class="form-label" for="quote-area">พื้นที่หน้างาน (ตารางเมตร) *</label>
+                            <input type="number" step="0.1" min="1" id="quote-area" class="form-control-custom" 
+                                   @bind="newQuotation.AreaSqm" @bind:after="OnFloorTypeOrAreaChanged" required />
+                        </div>
+                    </div>
+
+                    <!-- 2. Conditional Pricing Options based on Area and Floor Type -->
+                    @if (newQuotation.AreaSqm > 0 && newQuotation.AreaSqm < 300)
+                    {
+                        <div class="form-group" style="background: rgba(245, 158, 11, 0.08); border-left: 3px solid var(--warning); padding: 10px 14px; border-radius: 6px; margin-bottom: 12px;">
+                            <label class="form-label" style="color: #b45309; font-weight: 600; font-size: 0.82rem; margin-bottom: 4px;">
+                                <i class="bi bi-calendar-week me-1"></i> พื้นที่ &lt; 300 ตร.ม. (คิดราคาเหมาแบบรายวัน) — จำนวนวันทำงาน *
+                            </label>
+                            <input type="number" min="1" step="1" class="form-control-custom" 
+                                   @bind="workingDays" @bind:after="OnFloorTypeOrAreaChanged" placeholder="ระบุจำนวนวันทำงาน เช่น 1, 2, 3" />
+                            <small class="text-muted" style="font-size: 0.75rem; margin-top: 2px; display: block;">
+                                อัตราเหมามาตรฐาน: Epoxy 6,000 บาท/วัน, PU 8,000 บาท/วัน
+                            </small>
+                        </div>
+                    }
+                    else if (newQuotation.AreaSqm >= 300)
+                    {
+                        <div class="form-group" style="background: rgba(59, 130, 246, 0.08); border-left: 3px solid var(--primary); padding: 10px 14px; border-radius: 6px; margin-bottom: 12px;">
+                            <label class="form-label" style="color: var(--primary); font-weight: 600; font-size: 0.82rem; margin-bottom: 4px;">
+                                เงื่อนไขวันทำงาน (พื้นที่ &ge; 300 ตร.ม. คิดราคาต่อ ตร.ม.)
+                            </label>
+                            <div style="display: flex; gap: 8px;">
+                                <button type="button" class="btn btn-sm @(!isHolidaySurcharge ? "btn-primary" : "btn-outline-secondary")" 
+                                        style="flex: 1; font-size: 0.82rem; padding: 6px;" @onclick="() => SetHoliday(false)">
+                                    <i class="bi bi-sun"></i> วันธรรมดา
+                                </button>
+                                <button type="button" class="btn btn-sm @(isHolidaySurcharge ? "btn-warning text-dark font-weight-bold" : "btn-outline-secondary")" 
+                                        style="flex: 1; font-size: 0.82rem; padding: 6px;" @onclick="() => SetHoliday(true)">
+                                    <i class="bi bi-moon-stars"></i> วันหยุด/เทศกาล/เร่งด่วน (2x)
+                                </button>
+                            </div>
+                        </div>
+                    }
+
+                    @if (selectedFloorType == "PU")
+                    {
+                        <div class="form-group" style="background: rgba(124, 58, 237, 0.08); border-left: 3px solid #7c3aed; padding: 10px 14px; border-radius: 6px; margin-bottom: 12px;">
+                            <label class="form-label" style="color: #7c3aed; font-weight: 600; font-size: 0.82rem; margin-bottom: 4px;">
+                                <i class="bi bi-layers-half me-1"></i> ความหนาเพิ่มเติม PU (มม.) (ทุก 2 มม. +20 บ./ตร.ม.)
+                            </label>
+                            <input type="number" min="0" step="0.5" class="form-control-custom" 
+                                   @bind="additionalThicknessMm" @bind:after="OnFloorTypeOrAreaChanged" placeholder="0" />
+                        </div>
+                    }
+
+                    <!-- 3. Job Description -->
+                    <div class="form-group">
+                        <label class="form-label" for="quote-job">รายการรายละเอียดงาน *</label>
+                        <textarea id="quote-job" class="form-control-custom" rows="2" @bind="newQuotation.JobDescription" required placeholder="เช่น บริการเคลือบพื้นผิว Epoxy Coating"></textarea>
+                    </div>
+
+                    <!-- 4. Price per unit & Total Price -->
+                    <div class="row" style="display: flex; gap: 12px; margin-bottom: 12px;">
+                        <div class="form-group" style="flex: 1;">
+                            <label class="form-label" for="quote-ppu">ราคาต่อหน่วย (บาท / ตร.ม.) *</label>
+                            <input type="number" step="0.01" min="0.01" id="quote-ppu" class="form-control-custom" 
+                                   @bind="newQuotation.PricePerUnit" @bind:after="RecalculateTotals" required />
+                            @if (currentCalcResult != null)
+                            {
+                                <small class="text-muted" style="font-size: 0.75rem; margin-top: 2px; display: block;">
+                                    @if (currentCalcResult.IsDailyRate)
+                                    {
+                                        <span>คำนวณจาก: ฿@currentCalcResult.BaseRateUsed.ToString("N0")/วัน × @workingDays วัน</span>
+                                    }
+                                    else
+                                    {
+                                        <span>คำนวณจาก: ฿@currentCalcResult.BaseRateUsed.ToString("N0")/ตร.ม.@(currentCalcResult.ThicknessSurcharge > 0 ? " + หนาเพิ่ม" : "")</span>
+                                    }
+                                </small>
+                            }
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label class="form-label">ราคารวมคำนวณอัตโนมัติ (บาท)</label>
+                            <input type="text" class="form-control-custom" value="฿@newQuotation.TotalPrice.ToString("N0")" disabled style="background-color: #f1f5f9; font-weight: bold; color: var(--primary); font-size: 1.05rem;" />
+                        </div>
+                    </div>
+
+                    <!-- 5. Deposit & Balance -->
+                    <div class="row" style="display: flex; gap: 12px; margin-bottom: 12px;">
+                        <div class="form-group" style="flex: 1;">
+                            <label class="form-label" for="quote-dep">ยอดเงินมัดจำ (กรอกจำนวนเงินได้) *</label>
+                            <input type="number" step="1" id="quote-dep" class="form-control-custom" @bind="newQuotation.DepositAmount" @bind:after="RecalculateBalance" required />
+                            <div class="form-text text-muted" style="font-size: 0.75rem; margin-top: 4px;">
+                                ค่ามัดจำเริ่มต้นระบบตั้งไว้ที่ 30% = ฿@autoDeposit.ToString("N0")
+                            </div>
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label class="form-label">ยอดเงินคงเหลือค้างชำระหลังติดตั้งเสร็จ</label>
+                            <input type="text" class="form-control-custom" value="฿@newQuotation.BalanceAmount.ToString("N0")" disabled style="background-color: #f1f5f9; font-weight: bold; color: var(--primary);" />
+                        </div>
+                    </div>
+
+                    <!-- 6. Slip Attachment (Optional) -->
+                    <div class="form-group mb-0" style="background: rgba(99,102,241,0.05); border: 1px dashed rgba(99,102,241,0.3); border-radius: 8px; padding: 12px; margin-top: 12px;">
+                        <label class="form-label" style="font-size: 0.85rem; font-weight: 600; color: var(--primary); margin-bottom: 4px;">
+                            <i class="bi bi-paperclip me-1"></i> แนบรูปภาพสลิปโอนเงิน (ถ้ามี)
+                        </label>
+                        <InputFile OnChange="OnFormSlipSelected" accept="image/*" class="form-control-custom" style="padding: 6px; font-size: 0.82rem;" />
+                        @if (!string.IsNullOrEmpty(newQuotation.PaymentSlipUrl))
+                        {
+                            <div class="d-flex align-items-center gap-2 mt-2">
+                                <img src="@newQuotation.PaymentSlipUrl" alt="Slip preview" style="max-height: 55px; border-radius: 4px; border: 1px solid #cbd5e1;" />
+                                <span class="text-success" style="font-size: 0.78rem;"><i class="bi bi-check-circle-fill me-1"></i>แนบสลิปแล้ว</span>
+                                <button type="button" class="btn btn-sm btn-link text-danger p-0" style="font-size: 0.78rem; text-decoration: none;" @onclick="() => newQuotation.PaymentSlipUrl = null">
+                                    <i class="bi bi-trash"></i> ลบรูป
+                                </button>
+                            </div>
+                        }
+                    </div>
+                </div>
+                <div class="modal-footer-custom">
+                    <button type="button" class="btn-custom btn-secondary-custom" @onclick="CloseModal">ยกเลิก</button>
+                    <button type="button" class="btn-custom btn-primary-custom" @onclick="SaveQuotation">บันทึกใบเสนอราคา</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Modal for Confirm Payment & Approve Quotation -->
+@if (isApproveModalOpen && approvingQuote != null)
+{
+    <div class="modal-overlay no-print" style="z-index: 1150;">
+        <div class="modal-content-custom" style="max-width: 520px;">
+            <div class="modal-header-custom" style="background: linear-gradient(135deg, #10b981, #059669); color: white;">
+                <h3 style="color: white; margin: 0; font-size: 1.1rem; font-weight: 700;">
+                    <i class="bi bi-check2-circle me-1"></i> ยืนยันการชำระเงินและอนุมัติใบเสนอราคา
+                </h3>
+                <button class="modal-close-btn" style="color: white;" @onclick="CloseApproveModal">&times;</button>
+            </div>
+            <div class="modal-body-custom" style="padding: 20px;">
+                <!-- Summary Card -->
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px; margin-bottom: 16px;">
+                    <div class="d-flex justify-content-between mb-1" style="font-size: 0.85rem;">
+                        <span class="text-muted">เลขที่ใบเสนอราคา:</span>
+                        <strong>QT-@approvingQuote.Id</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-1" style="font-size: 0.85rem;">
+                        <span class="text-muted">ลูกค้า:</span>
+                        <strong>@approvingQuote.Customer?.Name</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-1" style="font-size: 0.85rem;">
+                        <span class="text-muted">ยอดรวมทั้งโครงการ:</span>
+                        <strong>฿@approvingQuote.TotalPrice.ToString("N0")</strong>
+                    </div>
+                    <div class="d-flex justify-content-between pt-2 border-top">
+                        <span style="font-size: 0.9rem; font-weight: 600; color: #059669;">ยอดเงินมัดจำที่ต้องชำระ:</span>
+                        <strong style="font-size: 1.15rem; color: #059669;">฿@approvingQuote.DepositAmount.ToString("N0")</strong>
+                    </div>
+                </div>
+
+                <!-- Slip Upload Box -->
+                <div class="form-group mb-3">
+                    <label class="form-label" style="font-weight: 600; color: #1e293b;">
+                        <i class="bi bi-image me-1 text-primary"></i> แนบรูปภาพสลิปโอนเงิน (Payment Slip)
+                    </label>
+                    <div style="border: 2px dashed #cbd5e1; border-radius: 8px; padding: 16px; text-align: center; background: #fafafa;">
+                        <InputFile OnChange="OnApproveSlipSelected" accept="image/*" class="form-control" id="approve-slip-file" style="display: none;" />
+                        <label for="approve-slip-file" class="btn btn-outline-primary btn-sm mb-0" style="cursor: pointer; padding: 6px 16px; font-weight: 600;">
+                            <i class="bi bi-upload me-1"></i> เลือกรูปภาพสลิป
+                        </label>
+                        <div class="text-muted mt-1" style="font-size: 0.75rem;">รองรับไฟล์รูปภาพ JPG, PNG, WebP</div>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(approveSlipDataUrl))
+                    {
+                        <div class="mt-3 text-center" style="background: #f1f5f9; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                            <img src="@approveSlipDataUrl" alt="Slip" style="max-height: 220px; max-width: 100%; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);" />
+                            <div class="mt-2">
+                                <button type="button" class="btn btn-sm btn-outline-danger" style="font-size: 0.75rem; padding: 2px 10px;" @onclick="() => approveSlipDataUrl = null">
+                                    <i class="bi bi-trash me-1"></i> ลบรูปสลิป
+                                </button>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <!-- Note -->
+                <div class="form-group mb-0">
+                    <label class="form-label" style="font-size: 0.85rem; color: #1e293b;">หมายเหตุการโอน / เลขที่อ้างอิง</label>
+                    <input type="text" class="form-control-custom" @bind="approvePaymentNote" placeholder="เช่น โอนเข้า บช. กสิกรไทย เวลา 14:30 น." />
+                </div>
+            </div>
+            <div class="modal-footer-custom" style="padding: 12px 20px;">
+                <button type="button" class="btn-custom btn-secondary-custom" @onclick="CloseApproveModal">ยกเลิก</button>
+                <button type="button" class="btn-custom btn-primary-custom" style="background: linear-gradient(135deg, #10b981, #059669);" @onclick="ConfirmApproveQuotation">
+                    <i class="bi bi-check2-circle me-1"></i> ยืนยันรับเงินและอนุมัติ
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Modal for Viewing Full Slip -->
+@if (selectedSlipQuote != null)
+{
+    <div class="modal-overlay no-print" style="z-index: 1200;" @onclick="CloseSlipModal">
+        <div class="modal-content-custom" style="max-width: 480px;" @onclick:stopPropagation="true">
+            <div class="modal-header-custom" style="background: #1e293b; color: white;">
+                <h3 style="color: white; margin: 0; font-size: 1rem; font-weight: 700;">
+                    <i class="bi bi-receipt me-1"></i> สลิปการโอนเงิน QT-@selectedSlipQuote.Id
+                </h3>
+                <button class="modal-close-btn" style="color: white;" @onclick="CloseSlipModal">&times;</button>
+            </div>
+            <div class="modal-body-custom text-center" style="padding: 20px; max-height: 75vh; overflow-y: auto;">
+                <img src="@selectedSlipQuote.PaymentSlipUrl" alt="Payment Slip" style="width: 100%; max-height: 480px; object-fit: contain; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" />
+                <div class="mt-3 text-start" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 12px; font-size: 0.82rem;">
+                    <div><strong>ลูกค้า:</strong> @selectedSlipQuote.Customer?.Name</div>
+                    <div><strong>ยอดเงินมัดจำ:</strong> ฿@selectedSlipQuote.DepositAmount.ToString("N0")</div>
+                    @if (selectedSlipQuote.ApprovedDate.HasValue)
+                    {
+                        <div><strong>อนุมัติเมื่อ:</strong> @selectedSlipQuote.ApprovedDate.Value.ToString("dd/MM/yyyy HH:mm") โดย @(selectedSlipQuote.ApprovedBy ?? "-")</div>
+                    }
+                    @if (!string.IsNullOrEmpty(selectedSlipQuote.PaymentNote))
+                    {
+                        <div><strong>หมายเหตุ:</strong> @selectedSlipQuote.PaymentNote</div>
+                    }
+                </div>
+            </div>
+            <div class="modal-footer-custom" style="padding: 10px 20px;">
+                <button type="button" class="btn-custom btn-secondary-custom" @onclick="CloseSlipModal">ปิด</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Print Preview Sheet Modal -->
+@if (selectedPrintQuote != null)
+{
+    <div class="modal-overlay @(isPrinting ? "print-section" : "")" style="background-color: rgba(0,0,0,0.85); overflow-y: auto; display: flex; align-items: flex-start; padding: 40px 10px; z-index: 1100;">
+        <div class="quotation-print-card" style="width: 100%; max-width: 800px; margin: auto;">
+            <!-- Print control header (hidden when printing) -->
+            <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom no-print">
+                <span class="text-dark"><strong>ตรวจสอบหน้าตาเอกสารก่อนพิมพ์</strong></span>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary" @onclick="TriggerPrint">
+                        <i class="bi bi-printer"></i> พิมพ์
+                    </button>
+                    <button class="btn btn-secondary" @onclick="ClosePrintPreview">ปิดหน้าต่าง</button>
+                </div>
+            </div>
+
+            <!-- Invoice Document Body -->
+            <div class="print-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f2444; padding-bottom: 16px; margin-bottom: 20px;">
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <img src="images/logo.png" alt="Company Logo" style="height: 72px; width: 72px; object-fit: cover; border-radius: 8px; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.06);" />
+                    <div class="print-company-info">
+                        <h2 style="margin: 0 0 4px 0; color: #0f2444; font-size: 1.35rem; font-weight: 800;">@companyConfig.Name</h2>
+                        <p style="font-size: 0.82rem; margin: 0; color: #475569; line-height: 1.45;">
+                            @companyConfig.Address<br />
+                            โทร: @companyConfig.Phone | อีเมล: @companyConfig.Email | เลขผู้เสียภาษี: @companyConfig.TaxId
+                        </p>
+                    </div>
+                </div>
+                <div class="print-title-area" style="text-align: right;">
+                    <h1 style="margin: 0; font-size: 1.8rem; font-weight: 800; color: #0f2444;">ใบเสนอราคา</h1>
+                    <span style="font-size: 0.95rem; font-weight: 700; color: #1e40af; letter-spacing: 1px;">QUOTATION</span>
+                </div>
+            </div>
+
+            <div class="print-meta-grid text-dark">
+                <div class="print-meta-box">
+                    <h4>ข้อมูลลูกค้า</h4>
+                    <strong>ชื่อลูกค้า:</strong> @selectedPrintQuote.Customer?.Name<br />
+                    <strong>เบอร์โทรศัพท์:</strong> @selectedPrintQuote.Customer?.Phone<br />
+                    <strong>ไลน์ไอดี:</strong> @(string.IsNullOrEmpty(selectedPrintQuote.Customer?.LineId) ? "-" : selectedPrintQuote.Customer?.LineId)<br />
+                    <strong>สถานที่ติดตั้ง:</strong> @selectedPrintQuote.Customer?.Address
+                </div>
+                <div class="print-meta-box">
+                    <h4>ข้อมูลใบเสนอราคา</h4>
+                    <div style="white-space: nowrap;"><strong>เลขที่ใบเสนอราคา:</strong> QT-@selectedPrintQuote.Id</div>
+                    <strong>วันที่เอกสาร:</strong> @selectedPrintQuote.CreatedDate.ToString("dd MMMM yyyy")<br />
+                    <strong>ผู้เสนอราคา:</strong> @(AuthService.CurrentUser?.FullName ?? "ฝ่ายบริการลูกค้า")<br />
+                    <strong>สถานะ:</strong> @GetStatusName(selectedPrintQuote.Status)
+                </div>
+            </div>
+
+            <table class="print-table text-dark">
+                <thead>
+                    <tr>
+                        <th style="width: 50px;" class="text-center">ลำดับ</th>
+                        <th>รายละเอียดรายการงานเคลือบพื้นผิว Epoxy</th>
+                        <th style="width: 100px;" class="text-end">พื้นที่ (ตร.ม.)</th>
+                        <th style="width: 120px;" class="text-end">ราคาต่อหน่วย</th>
+                        <th style="width: 150px;" class="text-end">ยอดรวมเงิน (บาท)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="text-center">1</td>
+                        <td>
+                            <strong>@selectedPrintQuote.JobDescription</strong><br />
+                            <span style="font-size: 0.8rem; color: #555;">(บริการรวมเครื่องมือช่าง, การขัดเตรียมผิวคอนกรีต, และการลงน้ำยาประสานรองพื้น)</span>
+                        </td>
+                        <td class="text-end">@selectedPrintQuote.AreaSqm.ToString("N0")</td>
+                        <td class="text-end">฿@selectedPrintQuote.PricePerUnit.ToString("N0")</td>
+                        <td class="text-end">฿@selectedPrintQuote.TotalPrice.ToString("N0")</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="print-summary-area text-dark">
+                <table class="print-summary-table">
+                    <tr>
+                        <td>ยอดเงินรวมสุทธิ</td>
+                        <td class="text-end">฿@selectedPrintQuote.TotalPrice.ToString("N0")</td>
+                    </tr>
+                    <tr>
+                        <td style="color: var(--success); font-weight: bold;">หักเงินมัดจำ</td>
+                        <td class="text-end" style="color: var(--success); font-weight: bold;">- ฿@selectedPrintQuote.DepositAmount.ToString("N0")</td>
+                    </tr>
+                    <tr class="total-row">
+                        <td>ยอดค้างชำระหลังติดตั้ง</td>
+                        <td class="text-end">฿@selectedPrintQuote.BalanceAmount.ToString("N0")</td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="text-dark" style="font-size: 0.78rem; margin-bottom: 24px; border: 1px solid #cbd5e1; padding: 12px 16px; border-radius: 6px; background: #f8fafc;">
+                <strong style="color: #1e3a8a; font-size: 0.82rem;">เงื่อนไขการเสนอราคาและการชำระเงิน:</strong>
+                <ol style="margin: 6px 0 0 0; padding-left: 18px; line-height: 1.6; color: #334155;">
+                    <li><strong>การคิดราคา:</strong> พื้นที่ &lt; 300 ตร.ม. คิดราคาเหมาแบบรายวัน / พื้นที่ &ge; 300 ตร.ม. คิดราคาต่อตารางเมตรตามอัตราที่กำหนด</li>
+                    <li><strong>วันหยุด/เทศกาล/เร่งด่วน:</strong> ค่าบริการต่อตารางเมตรปรับเพิ่มเป็น 2 เท่าของอัตราวันธรรมดา</li>
+                    <li><strong>การชำระเงิน:</strong> ลูกค้ามัดจำ @((selectedPrintQuote.TotalPrice > 0 ? Math.Round(selectedPrintQuote.DepositAmount / selectedPrintQuote.TotalPrice * 100) : 0).ToString("N0"))% (จำนวน ฿@selectedPrintQuote.DepositAmount.ToString("N0")) ก่อนเริ่มงาน ส่วนที่เหลือ ฿@selectedPrintQuote.BalanceAmount.ToString("N0") ชำระเมื่อส่งมอบงานเรียบร้อย</li>
+                    <li><strong>สภาพพื้นผิว:</strong> ราคาประเมินจากพื้นผิวเดิมมาตรฐาน หากมีความชื้นสูงหรือต้องปรับระดับ มีค่าใช้จ่ายเพิ่มตามจริง</li>
+                    <li><strong>การรับประกัน:</strong> รับประกันเนื้องานตามระยะเวลาที่ตกลง (ไม่ครอบคลุมการใช้งานผิดประเภท)</li>
+                    <li><strong>ระยะเวลายืนราคา:</strong> ใบเสนอราคานี้มีผลบังคับใช้เป็นเวลา <strong>15 วัน</strong> นับจากวันที่ออกเอกสาร</li>
+                </ol>
+            </div>
+
+            <div class="print-signatures text-dark">
+                <div>
+                    <p>ตกลงรับข้อเสนอของทางบริษัท</p>
+                    <div class="signature-line">
+                        ลงชื่อ......................................................<br />
+                        ลูกค้า / ผู้สั่งจ้าง<br />
+                        วันที่ ......./......./.......
+                    </div>
+                </div>
+                 <div>
+                    <p>เสนอราคาในนาม @companyConfig.Name</p>
+                    <div class="signature-line">
+                        ลงชื่อ......................................................<br />
+                        ผู้เสนอราคา / ผู้รับมอบอำนาจ<br />
+                        วันที่ ......./......./.......
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Quotation> quotations = new();
+    private List<Customer> customers = new();
+
+    private bool isModalOpen = false;
+    private Quotation newQuotation = new();
+    private decimal autoDeposit = 0;
+
+    // Customer Combobox states
+    private string customerSearchText = string.Empty;
+    private bool showCustomerDropdown = false;
+    private List<Customer> customerSuggestions = new();
+    private bool isNewCustomer = false;
+
+    // New Customer Details
+    private string newCustomerPhone = string.Empty;
+    private string newCustomerAddress = string.Empty;
+    private string newCustomerLineId = string.Empty;
+
+    // Pricing state & parameters
+    private string selectedFloorType = "Epoxy Coating";
+    private int workingDays = 1;
+    private bool isHolidaySurcharge = false;
+    private decimal additionalThicknessMm = 0;
+    private EpoxyFloorManager.Services.PricingCalculationResult? currentCalcResult = null;
+
+    // Print states
+    private Quotation? selectedPrintQuote = null;
+    private bool isPrinting = false;
+    private CompanyProfile companyConfig = new();
+
+    protected override void OnInitialized()
+    {
+        LoadData();
+    }
+
+    private void LoadData()
+    {
+        companyConfig = Db.CompanyProfiles.FirstOrDefault() ?? new CompanyProfile();
+        customers = Db.Customers.OrderBy(c => c.Name).ToList();
+        quotations = Db.Quotations
+            .Include(q => q.Customer)
+            .OrderByDescending(q => q.Id)
+            .ToList();
+    }
+
+    private void SetHoliday(bool isHoliday)
+    {
+        isHolidaySurcharge = isHoliday;
+        OnFloorTypeOrAreaChanged();
+    }
+
+    private void OnFloorTypeOrAreaChanged()
+    {
+        if (newQuotation.AreaSqm > 0)
+        {
+            currentCalcResult = PricingService.CalculatePrice(
+                selectedFloorType,
+                newQuotation.AreaSqm,
+                workingDays > 0 ? workingDays : 1,
+                isHolidaySurcharge,
+                selectedFloorType == "PU" ? additionalThicknessMm : 0m
+            );
+
+            newQuotation.PricePerUnit = Math.Round(currentCalcResult.PricePerUnit, 2);
+
+            var rateDesc = currentCalcResult.IsDailyRate 
+                ? $" (คิดราคาเหมาแบบรายวัน {workingDays} วัน)" 
+                : (isHolidaySurcharge ? " (อัตราวันหยุด/เร่งด่วน)" : "");
+            var thickDesc = (selectedFloorType == "PU" && additionalThicknessMm > 0) ? $" ความหนา +{additionalThicknessMm} มม." : "";
+            newQuotation.JobDescription = $"บริการทำพื้น {selectedFloorType}{thickDesc} พื้นที่ {newQuotation.AreaSqm:N0} ตร.ม.{rateDesc}";
+        }
+        else
+        {
+            currentCalcResult = null;
+        }
+
+        RecalculateTotals();
+    }
+
+    private void OpenAddModal()
+    {
+        selectedFloorType = "Epoxy Coating";
+        workingDays = 1;
+        isHolidaySurcharge = false;
+        additionalThicknessMm = 0;
+
+        newQuotation = new Quotation
+        {
+            AreaSqm = 100,
+            Status = QuotationStatus.Draft
+        };
+
+        OnFloorTypeOrAreaChanged();
+
+        customerSearchText = string.Empty;
+        showCustomerDropdown = false;
+        isNewCustomer = false;
+        newCustomerPhone = string.Empty;
+        newCustomerAddress = string.Empty;
+        newCustomerLineId = string.Empty;
+
+        RecalculateTotals();
+        isModalOpen = true;
+    }
+
+    private void OpenEditModal(Quotation q)
+    {
+        newQuotation = new Quotation
+        {
+            Id = q.Id,
+            CustomerId = q.CustomerId,
+            JobDescription = q.JobDescription,
+            AreaSqm = q.AreaSqm,
+            PricePerUnit = q.PricePerUnit,
+            DepositAmount = q.DepositAmount,
+            Status = q.Status,
+            CreatedDate = q.CreatedDate
+        };
+
+        if (q.JobDescription.Contains("PU", StringComparison.OrdinalIgnoreCase))
+            selectedFloorType = "PU";
+        else if (q.JobDescription.Contains("Self-Leveling", StringComparison.OrdinalIgnoreCase))
+            selectedFloorType = "Epoxy Self-Leveling";
+        else
+            selectedFloorType = "Epoxy Coating";
+
+        isHolidaySurcharge = q.JobDescription.Contains("วันหยุด", StringComparison.OrdinalIgnoreCase) || q.JobDescription.Contains("เร่งด่วน", StringComparison.OrdinalIgnoreCase);
+        workingDays = 1;
+        additionalThicknessMm = 0;
+
+        if (newQuotation.AreaSqm > 0)
+        {
+            currentCalcResult = PricingService.CalculatePrice(
+                selectedFloorType,
+                newQuotation.AreaSqm,
+                workingDays,
+                isHolidaySurcharge,
+                selectedFloorType == "PU" ? additionalThicknessMm : 0m
+            );
+        }
+
+        var cust = customers.FirstOrDefault(c => c.Id == q.CustomerId);
+        if (cust != null)
+        {
+            customerSearchText = cust.Name;
+            isNewCustomer = false;
+        }
+        else
+        {
+            customerSearchText = string.Empty;
+            isNewCustomer = false;
+        }
+
+        showCustomerDropdown = false;
+        newCustomerPhone = string.Empty;
+        newCustomerAddress = string.Empty;
+        newCustomerLineId = string.Empty;
+
+        RecalculateTotals();
+        isModalOpen = true;
+    }
+
+    private void CloseModal()
+    {
+        isModalOpen = false;
+    }
+
+    private void RecalculateTotals()
+    {
+        autoDeposit = newQuotation.TotalPrice * 0.30m;
+        newQuotation.DepositAmount = Math.Round(autoDeposit);
+    }
+
+    private void RecalculateBalance()
+    {
+        if (newQuotation.DepositAmount > newQuotation.TotalPrice)
+        {
+            newQuotation.DepositAmount = newQuotation.TotalPrice;
+        }
+    }
+
+    // Customer Combobox Event Handlers
+    private void OnCustomerInput(ChangeEventArgs e)
+    {
+        customerSearchText = e.Value?.ToString() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(customerSearchText))
+        {
+            customerSuggestions = new();
+            showCustomerDropdown = false;
+            newQuotation.CustomerId = 0;
+            isNewCustomer = false;
+        }
+        else
+        {
+            var q = customerSearchText.ToLower();
+            customerSuggestions = customers
+                .Where(c => c.Name.ToLower().Contains(q))
+                .Take(8)
+                .ToList();
+            showCustomerDropdown = customerSuggestions.Any();
+
+            var exactMatch = customers.FirstOrDefault(c => c.Name.Equals(customerSearchText, StringComparison.OrdinalIgnoreCase));
+            if (exactMatch != null)
+            {
+                newQuotation.CustomerId = exactMatch.Id;
+                isNewCustomer = false;
+            }
+            else
+            {
+                newQuotation.CustomerId = 0;
+                isNewCustomer = true;
+            }
+        }
+    }
+
+    private void OnCustomerFocus()
+    {
+        if (!string.IsNullOrWhiteSpace(customerSearchText))
+        {
+            var q = customerSearchText.ToLower();
+            customerSuggestions = customers
+                .Where(c => c.Name.ToLower().Contains(q))
+                .Take(8)
+                .ToList();
+        }
+        else
+        {
+            customerSuggestions = customers.Take(8).ToList();
+        }
+        showCustomerDropdown = customerSuggestions.Any();
+    }
+
+    private void OnCustomerBlur()
+    {
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(200);
+            showCustomerDropdown = false;
+            await InvokeAsync(StateHasChanged);
+        });
+    }
+
+    private void SelectCustomer(Customer cust)
+    {
+        customerSearchText = cust.Name;
+        newQuotation.CustomerId = cust.Id;
+        isNewCustomer = false;
+        showCustomerDropdown = false;
+
+        newCustomerPhone = string.Empty;
+        newCustomerAddress = string.Empty;
+        newCustomerLineId = string.Empty;
+    }
+
+    private void SaveQuotation()
+    {
+        if (isNewCustomer && string.IsNullOrWhiteSpace(customerSearchText))
+        {
+            return;
+        }
+        if (!isNewCustomer && newQuotation.CustomerId == 0)
+        {
+            return;
+        }
+
+        // 1. If customer is new, save it first
+        if (isNewCustomer)
+        {
+            var newCust = new Customer
+            {
+                Name = customerSearchText.Trim(),
+                Phone = newCustomerPhone.Trim(),
+                Address = newCustomerAddress.Trim(),
+                LineId = newCustomerLineId.Trim(),
+                CreatedDate = DateTime.Now
+            };
+            Db.Customers.Add(newCust);
+            Db.SaveChanges(); // Get Id
+            newQuotation.CustomerId = newCust.Id;
+        }
+
+        // 2. Save the quotation
+        if (newQuotation.Id == 0)
+        {
+            newQuotation.CreatedDate = DateTime.Now;
+            Db.Quotations.Add(newQuotation);
+        }
+        else
+        {
+            var existing = Db.Quotations.Find(newQuotation.Id);
+            if (existing != null)
+            {
+                existing.CustomerId = newQuotation.CustomerId;
+                existing.JobDescription = newQuotation.JobDescription;
+                existing.AreaSqm = newQuotation.AreaSqm;
+                existing.PricePerUnit = newQuotation.PricePerUnit;
+                existing.DepositAmount = newQuotation.DepositAmount;
+                existing.Status = newQuotation.Status;
+                Db.Quotations.Update(existing);
+            }
+        }
+
+        Db.SaveChanges();
+        isModalOpen = false;
+        LoadData();
+    }
+
+    // Approval & Slip Modal States
+    private bool isApproveModalOpen = false;
+    private Quotation? approvingQuote = null;
+    private string? approveSlipDataUrl = null;
+    private string approvePaymentNote = string.Empty;
+
+    // View Slip Modal State
+    private Quotation? selectedSlipQuote = null;
+
+    private async Task OnFormSlipSelected(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            var file = e.File;
+            if (file != null)
+            {
+                using var stream = file.OpenReadStream(5 * 1024 * 1024);
+                using var ms = new MemoryStream();
+                await stream.CopyToAsync(ms);
+                newQuotation.PaymentSlipUrl = $"data:{file.ContentType};base64,{Convert.ToBase64String(ms.ToArray())}";
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error uploading form slip: {ex.Message}");
+        }
+    }
+
+    private void OpenApproveModal(Quotation q)
+    {
+        approvingQuote = q;
+        approveSlipDataUrl = q.PaymentSlipUrl;
+        approvePaymentNote = q.PaymentNote ?? string.Empty;
+        isApproveModalOpen = true;
+    }
+
+    private void CloseApproveModal()
+    {
+        isApproveModalOpen = false;
+        approvingQuote = null;
+        approveSlipDataUrl = null;
+        approvePaymentNote = string.Empty;
+    }
+
+    private async Task OnApproveSlipSelected(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            var file = e.File;
+            if (file != null)
+            {
+                using var stream = file.OpenReadStream(5 * 1024 * 1024);
+                using var ms = new MemoryStream();
+                await stream.CopyToAsync(ms);
+                approveSlipDataUrl = $"data:{file.ContentType};base64,{Convert.ToBase64String(ms.ToArray())}";
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error uploading approve slip: {ex.Message}");
+        }
+    }
+
+    private void ConfirmApproveQuotation()
+    {
+        if (approvingQuote == null) return;
+
+        var q = Db.Quotations.Find(approvingQuote.Id);
+        if (q != null)
+        {
+            q.Status = QuotationStatus.Approved;
+            q.PaymentSlipUrl = approveSlipDataUrl;
+            q.ApprovedDate = DateTime.Now;
+            q.ApprovedBy = AuthService.CurrentUser?.FullName ?? "ผู้ดูแลระบบ";
+            q.PaymentNote = approvePaymentNote;
+            Db.Quotations.Update(q);
+
+            var hasProcess = Db.InstallationProcesses.Any(p => p.QuotationId == q.Id);
+            if (!hasProcess)
+            {
+                var process = new InstallationProcess
+                {
+                    QuotationId = q.Id,
+                    StepStatus = InstallationStep.SurfacePrep,
+                    StartDate = DateTime.Now,
+                    PaymentStatus = PaymentStatus.Pending
+                };
+                Db.InstallationProcesses.Add(process);
+            }
+
+            var noteDesc = !string.IsNullOrEmpty(approvePaymentNote) ? $" ({approvePaymentNote})" : "";
+            var financeEntry = new Finance
+            {
+                Type = FinanceType.Income,
+                Amount = q.DepositAmount,
+                Description = $"[รายรับค่ามัดจำ] เงินมัดจำใบเสนอราคา QT-{q.Id} ลูกค้า {q.Customer?.Name}{noteDesc}",
+                RecordedDate = DateTime.Now,
+                QuotationId = q.Id,
+                ReferenceNo = $"REC-DP{q.Id}"
+            };
+            Db.Finances.Add(financeEntry);
+
+            Db.SaveChanges();
+        }
+
+        CloseApproveModal();
+        LoadData();
+    }
+
+    private void OpenSlipModal(Quotation q)
+    {
+        selectedSlipQuote = q;
+    }
+
+    private void CloseSlipModal()
+    {
+        selectedSlipQuote = null;
+    }
+
+    private void CancelQuotation(Quotation q)
+    {
+        q.Status = QuotationStatus.Cancelled;
+        Db.Quotations.Update(q);
+        Db.SaveChanges();
+        LoadData();
+    }
+
+    private void OpenPrintPreview(Quotation q)
+    {
+        selectedPrintQuote = q;
+    }
+
+    private void ClosePrintPreview()
+    {
+        selectedPrintQuote = null;
+        isPrinting = false;
+    }
+
+    private async Task TriggerPrint()
+    {
+        isPrinting = true;
+        StateHasChanged();
+        await Task.Delay(200);
+        await JS.InvokeVoidAsync("window.print");
+        isPrinting = false;
+        StateHasChanged();
+    }
+
+    private string GetStatusName(QuotationStatus status) => status switch
+    {
+        QuotationStatus.Draft => "ฉบับร่าง",
+        QuotationStatus.Approved => "อนุมัติแล้ว",
+        QuotationStatus.Cancelled => "ยกเลิกแล้ว",
+        _ => ""
+    };
+}

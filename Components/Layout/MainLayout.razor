@@ -1,0 +1,203 @@
+@inherits LayoutComponentBase
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+@inject EpoxyDbContext Db
+@using EpoxyFloorManager.Models
+@implements IDisposable
+
+<div class="page-container">
+    @if (AuthService.IsLoggedIn)
+    {
+        <div class="app-layout">
+            <aside class="sidebar-container @(isSidebarExpanded ? "expanded" : "")">
+                <NavMenu />
+            </aside>
+            <div class="main-container">
+                <header class="app-header no-print">
+                    <div class="header-left d-flex align-items-center gap-2">
+                        <button class="mobile-toggle" @onclick="ToggleSidebar">
+                            <span class="bar"></span>
+                            <span class="bar"></span>
+                            <span class="bar"></span>
+                        </button>
+                        <img src="images/logo.png" alt="Logo" style="height: 34px; width: 34px; object-fit: cover; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.15);" class="d-none d-sm-inline-block" />
+                        <h1 class="header-title mb-0">จัดการพื้น Epoxy ช่างแขก</h1>
+                    </div>
+                    <div class="header-right">
+                        @if (AuthService.CurrentUser?.Role == UserRole.Admin || AuthService.CurrentUser?.Role == UserRole.ProjectManager)
+                        {
+                            <button class="btn btn-outline-light btn-sm me-3 d-flex align-items-center gap-1" style="background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.2); color: white;" @onclick="OpenSettings" title="ตั้งค่าข้อมูลบริษัท">
+                                <i class="bi bi-gear-fill text-warning"></i> <span>ตั้งค่าบริษัท</span>
+                            </button>
+                        }
+                        <span class="badge-role badge-@AuthService.CurrentUser?.Role.ToString().ToLower()">
+                            @GetRoleName(AuthService.CurrentUser?.Role)
+                        </span>
+                        <span class="user-name">@AuthService.CurrentUser?.FullName</span>
+                        <button class="btn btn-outline-danger btn-sm" @onclick="Logout">
+                            <i class="bi bi-box-arrow-right"></i> ออกจากระบบ
+                        </button>
+                    </div>
+                </header>
+                <main class="app-main-content">
+                    <article class="content-viewport">
+                        @Body
+                    </article>
+                </main>
+            </div>
+        </div>
+    }
+    else
+    {
+        <main class="login-layout">
+            @Body
+        </main>
+    }
+</div>
+
+@if (isSettingsOpen)
+{
+    <div class="modal-overlay" style="background-color: rgba(15, 23, 42, 0.65); z-index: 1200; position: fixed; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);">
+        <div class="modal-content-custom" style="max-width: 500px; width: 90%; background: #1e1e2d; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); overflow: hidden; display: flex; flex-direction: column; color: var(--text-primary);">
+            <div class="modal-header-custom" style="padding: 16px 24px; background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: white; display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: white;"><i class="bi bi-gear-fill" style="margin-right: 8px;"></i>ตั้งค่าข้อมูลบริษัท</h3>
+                <button class="modal-close-btn" style="background: rgba(255,255,255,0.15); border: none; color: white; font-size: 1.3rem; cursor: pointer; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center;" @onclick="() => isSettingsOpen = false">&times;</button>
+            </div>
+            <div class="modal-body-custom" style="padding: 24px; max-height: 70vh; overflow-y: auto;">
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label class="form-label" style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.95rem; color: var(--text-primary);">ชื่อบริษัท *</label>
+                    <input type="text" class="form-control-custom" @bind="companyProfile.Name" style="width: 100%;" placeholder="เช่น บริษัท เอ็กซ์เพิร์ท อีพ็อกซี่ จำกัด" required />
+                </div>
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label class="form-label" style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.95rem; color: var(--text-primary);">ที่อยู่บริษัท *</label>
+                    <textarea class="form-control-custom" @bind="companyProfile.Address" style="width: 100%; min-height: 80px;" placeholder="ที่อยู่สำหรับออกเอกสาร" required></textarea>
+                </div>
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label class="form-label" style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.95rem; color: var(--text-primary);">เบอร์โทรศัพท์</label>
+                    <input type="text" class="form-control-custom" @bind="companyProfile.Phone" style="width: 100%;" placeholder="เช่น 02-123-4567" />
+                </div>
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label class="form-label" style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.95rem; color: var(--text-primary);">อีเมล</label>
+                    <input type="email" class="form-control-custom" @bind="companyProfile.Email" style="width: 100%;" placeholder="เช่น contact@expertepoxy.com" />
+                </div>
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label class="form-label" style="display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.95rem; color: var(--text-primary);">เลขผู้เสียภาษี</label>
+                    <input type="text" class="form-control-custom" @bind="companyProfile.TaxId" style="width: 100%;" placeholder="เช่น 0105563999888" />
+                </div>
+
+                @if (!string.IsNullOrEmpty(settingsErrorMessage))
+                {
+                    <div style="background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); border-radius: 10px; padding: 10px 14px; margin-top: 12px; color: #ef4444; font-size: 0.9rem;">
+                        <i class="bi bi-exclamation-triangle" style="margin-right: 6px;"></i>
+                        @settingsErrorMessage
+                    </div>
+                }
+            </div>
+            <div class="modal-footer-custom" style="padding: 16px 24px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: flex-end; gap: 12px; background-color: rgba(255,255,255,0.02);">
+                <button type="button" class="btn-custom btn-secondary-custom" @onclick="() => isSettingsOpen = false">ยกเลิก</button>
+                <button type="button" class="btn-custom btn-primary-custom" @onclick="SaveSettings">บันทึกตั้งค่า</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool isSidebarExpanded = true;
+    private bool isSettingsOpen = false;
+    private CompanyProfile companyProfile = new();
+    private string settingsErrorMessage = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        AuthService.OnChange += StateHasChanged;
+        NavigationManager.LocationChanged += OnLocationChanged;
+        // Only redirect if not logged in AND not already going to login
+        RedirectIfNotLoggedIn();
+    }
+
+    private void OpenSettings()
+    {
+        settingsErrorMessage = string.Empty;
+        companyProfile = Db.CompanyProfiles.FirstOrDefault() ?? new CompanyProfile();
+        isSettingsOpen = true;
+    }
+
+    private void SaveSettings()
+    {
+        if (string.IsNullOrWhiteSpace(companyProfile.Name))
+        {
+            settingsErrorMessage = "กรุณาระบุชื่อบริษัท";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(companyProfile.Address))
+        {
+            settingsErrorMessage = "กรุณาระบุที่อยู่บริษัท";
+            return;
+        }
+
+        var existing = Db.CompanyProfiles.FirstOrDefault();
+        if (existing != null)
+        {
+            existing.Name = companyProfile.Name.Trim();
+            existing.Address = companyProfile.Address.Trim();
+            existing.Phone = (companyProfile.Phone ?? string.Empty).Trim();
+            existing.Email = (companyProfile.Email ?? string.Empty).Trim();
+            existing.TaxId = (companyProfile.TaxId ?? string.Empty).Trim();
+            Db.CompanyProfiles.Update(existing);
+        }
+        else
+        {
+            Db.CompanyProfiles.Add(companyProfile);
+        }
+        Db.SaveChanges();
+        isSettingsOpen = false;
+        
+        // Refresh page to propagate new config settings
+        NavigationManager.NavigateTo(NavigationManager.Uri, forceLoad: true);
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        // MainLayout is only used for authenticated pages.
+        // Login page uses LoginLayout, so we just need to redirect to login if session expired.
+        RedirectIfNotLoggedIn();
+        StateHasChanged();
+    }
+
+    private void RedirectIfNotLoggedIn()
+    {
+        if (!AuthService.IsLoggedIn)
+        {
+            var path = NavigationManager.ToBaseRelativePath(NavigationManager.Uri).Split('?')[0];
+            if (!path.Equals("login", StringComparison.OrdinalIgnoreCase))
+            {
+                NavigationManager.NavigateTo("/login", forceLoad: false);
+            }
+        }
+    }
+
+    private void ToggleSidebar()
+    {
+        isSidebarExpanded = !isSidebarExpanded;
+    }
+
+    private void Logout()
+    {
+        AuthService.Logout();
+        NavigationManager.NavigateTo("login");
+    }
+
+    private string GetRoleName(UserRole? role) => role switch
+    {
+        UserRole.Admin => "ผู้ดูแลระบบ",
+        UserRole.ProjectManager => "ผู้จัดการโครงการ",
+        UserRole.Staff => "พนักงานทั่วไป",
+        _ => ""
+    };
+
+    public void Dispose()
+    {
+        AuthService.OnChange -= StateHasChanged;
+        NavigationManager.LocationChanged -= OnLocationChanged;
+    }
+}
