@@ -22,5 +22,14 @@ public class AuthService
         NotifyStateChanged();
     }
 
+    public void UpdateCurrentUser(User user)
+    {
+        if (CurrentUser != null && CurrentUser.Id == user.Id)
+        {
+            CurrentUser = user;
+            NotifyStateChanged();
+        }
+    }
+
     private void NotifyStateChanged() => OnChange?.Invoke();
 }

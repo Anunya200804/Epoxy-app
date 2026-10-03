@@ -28,30 +28,6 @@ public static class DbInitializer
             context.SaveChanges();
         }
 
-        // Ensure all users have correct Thai names
-        var adminUser = context.Users.FirstOrDefault(u => u.Username == "admin");
-        if (adminUser != null)
-        {
-            adminUser.FullName = "สมเกียรติ รักงาน";
-            adminUser.Role = UserRole.Admin;
-        }
-
-        var pmUser = context.Users.FirstOrDefault(u => u.Username == "pm");
-        if (pmUser != null)
-        {
-            pmUser.FullName = "วิชัย จัดการดี";
-            pmUser.Role = UserRole.ProjectManager;
-        }
-
-        var staffUser = context.Users.FirstOrDefault(u => u.Username == "staff");
-        if (staffUser != null)
-        {
-            staffUser.FullName = "สมศรี มีใจ";
-            staffUser.Role = UserRole.Staff;
-        }
-
-        context.SaveChanges();
-
         if (context.Users.Any())
         {
             return;

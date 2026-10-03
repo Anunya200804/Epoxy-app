@@ -13,7 +13,11 @@ builder.Services.AddRazorComponents()
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 var serverVersion = new MySqlServerVersion(new Version(8, 0, 36));
 builder.Services.AddDbContext<EpoxyDbContext>(options =>
-    options.UseMySql(connectionString, serverVersion));
+    options.UseMySql(connectionString, serverVersion, mySqlOptions =>
+        mySqlOptions.EnableRetryOnFailure(
+            maxRetryCount: 5,
+            maxRetryDelay: TimeSpan.FromSeconds(5),
+            errorNumbersToAdd: null)));
 
 // Register AuthService
 builder.Services.AddScoped<AuthService>();

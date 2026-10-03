@@ -111,7 +111,14 @@
         }
         catch (Exception ex)
         {
-            errorMessage = "เกิดข้อผิดพลาด: " + ex.Message;
+            if (ex.Message.Contains("transient failure") || ex.Message.Contains("Unable to connect") || ex.Message.Contains("Connection refused"))
+            {
+                errorMessage = "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กำลังเชื่อมต่อใหม่ กรุณาลองอีกครั้ง";
+            }
+            else
+            {
+                errorMessage = "เกิดข้อผิดพลาด: " + ex.Message;
+            }
             isLoading = false;
         }
     }
