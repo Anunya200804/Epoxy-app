@@ -234,9 +234,9 @@
                         <div class="form-group" style="flex: 1; margin-bottom: 0;">
                             <label class="form-label">ประเภทพื้น *</label>
                             <select class="form-control-custom" @bind="selectedFloorType" @bind:after="OnFloorTypeOrAreaChanged">
-                                <option value="Epoxy Coating">Epoxy Coating (อีพ็อกซี่เคลือบ)</option>
-                                <option value="Epoxy Self-Leveling">Epoxy Self-Leveling (อีพ็อกซี่เทราบ)</option>
-                                <option value="PU">PU (พอลิยูรีเทน)</option>
+                                <option value="Epoxy Coating">Epoxy Coating </option>
+                                <option value="Epoxy Self-Leveling">Epoxy Self-Leveling </option>
+                                <option value="PU">PU </option>
                             </select>
                         </div>
                         <div class="form-group" style="flex: 1; margin-bottom: 0;">
@@ -488,20 +488,21 @@
             </div>
 
             <!-- Invoice Document Body -->
-            <div class="print-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f2444; padding-bottom: 16px; margin-bottom: 20px;">
-                <div style="display: flex; align-items: center; gap: 16px;">
-                    <img src="images/logo.png" alt="Company Logo" style="height: 72px; width: 72px; object-fit: cover; border-radius: 8px; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.06);" />
-                    <div class="print-company-info">
+            <div class="print-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f2444; padding-bottom: 16px; margin-bottom: 20px; gap: 20px;">
+                <div style="display: flex; align-items: center; gap: 16px; flex: 1; min-width: 0;">
+                    <img src="images/logo.png" alt="Company Logo" style="height: 72px; width: 72px; object-fit: cover; border-radius: 8px; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.06); flex-shrink: 0;" />
+                    <div class="print-company-info" style="min-width: 0;">
                         <h2 style="margin: 0 0 4px 0; color: #0f2444; font-size: 1.35rem; font-weight: 800;">@companyConfig.Name</h2>
                         <p style="font-size: 0.82rem; margin: 0; color: #475569; line-height: 1.45;">
                             @companyConfig.Address<br />
-                            โทร: @companyConfig.Phone | อีเมล: @companyConfig.Email | เลขผู้เสียภาษี: @companyConfig.TaxId
+                            โทร: @companyConfig.Phone | อีเมล: @companyConfig.Email<br />
+                            <span style="white-space: nowrap;">เลขประจำตัวผู้เสียภาษี: @companyConfig.TaxId</span>
                         </p>
                     </div>
                 </div>
-                <div class="print-title-area" style="text-align: right;">
-                    <h1 style="margin: 0; font-size: 1.8rem; font-weight: 800; color: #0f2444;">ใบเสนอราคา</h1>
-                    <span style="font-size: 0.95rem; font-weight: 700; color: #1e40af; letter-spacing: 1px;">QUOTATION</span>
+                <div class="print-title-area" style="text-align: right; flex-shrink: 0; white-space: nowrap;">
+                    <h1 style="margin: 0; font-size: 1.8rem; font-weight: 800; color: #0f2444; white-space: nowrap;">ใบเสนอราคา</h1>
+                    <span style="font-size: 0.95rem; font-weight: 700; color: #1e40af; letter-spacing: 1px; white-space: nowrap;">QUOTATION</span>
                 </div>
             </div>
 
@@ -546,19 +547,19 @@
                 </tbody>
             </table>
 
-            <div class="print-summary-area text-dark">
-                <table class="print-summary-table">
+            <div class="print-summary-area text-dark" style="margin-bottom: 24px;">
+                <table class="print-summary-table" style="width: 380px; max-width: 100%;">
                     <tr>
-                        <td>ยอดเงินรวมสุทธิ</td>
-                        <td class="text-end">฿@selectedPrintQuote.TotalPrice.ToString("N0")</td>
+                        <td style="white-space: nowrap;">ยอดเงินรวมสุทธิ</td>
+                        <td class="text-end" style="white-space: nowrap;">฿@selectedPrintQuote.TotalPrice.ToString("N0")</td>
                     </tr>
                     <tr>
-                        <td style="color: var(--success); font-weight: bold;">หักเงินมัดจำ</td>
-                        <td class="text-end" style="color: var(--success); font-weight: bold;">- ฿@selectedPrintQuote.DepositAmount.ToString("N0")</td>
+                        <td style="color: #15803d; font-weight: 600; white-space: nowrap;">หักเงินมัดจำ</td>
+                        <td class="text-end" style="color: #15803d; font-weight: 600; white-space: nowrap;">- ฿@selectedPrintQuote.DepositAmount.ToString("N0")</td>
                     </tr>
                     <tr class="total-row">
-                        <td>ยอดค้างชำระหลังติดตั้ง</td>
-                        <td class="text-end">฿@selectedPrintQuote.BalanceAmount.ToString("N0")</td>
+                        <td style="white-space: nowrap; font-weight: 700;">ยอดค้างชำระหลังติดตั้ง</td>
+                        <td class="text-end" style="white-space: nowrap; font-weight: 800;">฿@selectedPrintQuote.BalanceAmount.ToString("N0")</td>
                     </tr>
                 </table>
             </div>
@@ -575,21 +576,21 @@
                 </ol>
             </div>
 
-            <div class="print-signatures text-dark">
+            <div class="print-signatures text-dark" style="margin-top: 40px;">
                 <div>
-                    <p>ตกลงรับข้อเสนอของทางบริษัท</p>
-                    <div class="signature-line">
-                        ลงชื่อ......................................................<br />
-                        ลูกค้า / ผู้สั่งจ้าง<br />
-                        วันที่ ......./......./.......
+                    <p style="font-weight: 600; margin-bottom: 30px;">ตกลงรับข้อเสนอของทางบริษัท</p>
+                    <div class="signature-line" style="border-top: none;">
+                        ลงชื่อ ................................................................<br />
+                        ( @(selectedPrintQuote.Customer?.Name ?? "ลูกค้า / ผู้สั่งจ้าง") )<br />
+                        วันที่ ......... / ......... / .................
                     </div>
                 </div>
                  <div>
-                    <p>เสนอราคาในนาม @companyConfig.Name</p>
-                    <div class="signature-line">
-                        ลงชื่อ......................................................<br />
-                        ผู้เสนอราคา / ผู้รับมอบอำนาจ<br />
-                        วันที่ ......./......./.......
+                    <p style="font-weight: 600; margin-bottom: 30px;">เสนอราคาในนาม @companyConfig.Name</p>
+                    <div class="signature-line" style="border-top: none;">
+                        ลงชื่อ ................................................................<br />
+                        ( @(AuthService.CurrentUser?.FullName ?? "ผู้เสนอราคา / ผู้รับมอบอำนาจ") )<br />
+                        วันที่ ......... / ......... / .................
                     </div>
                 </div>
             </div>

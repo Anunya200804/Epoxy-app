@@ -1008,8 +1008,9 @@ body {
 }
 
 .print-company-info h2 { margin: 0 0 5px 0; color: var(--primary); font-size: 1.5rem; }
-.print-title-area { text-align: right; }
-.print-title-area h1 { margin: 0; font-size: 1.75rem; color: #333; }
+.print-title-area { text-align: right; white-space: nowrap; flex-shrink: 0; }
+.print-title-area h1 { margin: 0; font-size: 1.75rem; color: #333; white-space: nowrap; }
+.print-title-area span { white-space: nowrap; display: block; }
 
 .print-meta-grid {
     display: grid;
@@ -1031,25 +1032,75 @@ body {
 .print-table th { border: 1px solid #ddd; background-color: #f5f5f5; padding: 8px; font-weight: bold; }
 .print-table td { border: 1px solid #ddd; padding: 8px; }
 
-.print-summary-area { display: flex; justify-content: flex-end; margin-bottom: 40px; }
-.print-summary-table { width: 300px; border-collapse: collapse; }
-.print-summary-table td { padding: 6px 10px; border-bottom: 1px solid #eee; }
-.print-summary-table tr.total-row { font-weight: bold; font-size: 1.1rem; }
-.print-summary-table tr.total-row td { border-top: 1px solid #333; border-bottom: 2px double #333; }
+.print-summary-area { 
+    display: flex; 
+    justify-content: flex-end; 
+    margin-bottom: 28px; 
+}
+
+.print-summary-table { 
+    width: 380px; 
+    max-width: 100%;
+    border-collapse: collapse; 
+    font-size: 0.88rem;
+}
+
+.print-summary-table td { 
+    padding: 7px 12px; 
+    border-bottom: 1px solid #e2e8f0; 
+    vertical-align: middle;
+}
+
+.print-summary-table td:first-child {
+    white-space: nowrap;
+    color: #475569;
+}
+
+.print-summary-table td:last-child {
+    white-space: nowrap;
+    text-align: right;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.print-summary-table tr.total-row { 
+    font-weight: 700; 
+    font-size: 0.95rem; 
+    background-color: #f8fafc;
+}
+
+.print-summary-table tr.total-row td { 
+    border-top: 1.5px solid #0f2444; 
+    border-bottom: 3px double #0f2444; 
+    padding: 8px 12px;
+}
+
+.print-summary-table tr.total-row td:first-child {
+    color: #0f2444;
+    font-weight: 700;
+}
+
+.print-summary-table tr.total-row td:last-child {
+    color: #0f2444;
+    font-size: 1.05rem;
+    font-weight: 800;
+}
 
 .print-signatures {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 50px;
+    gap: 40px;
     text-align: center;
-    margin-top: 50px;
+    margin-top: 40px;
 }
 
 .signature-line {
-    border-top: 1px solid #666;
-    margin-top: 40px;
-    padding-top: 5px;
-    font-size: 0.85rem;
+    border-top: none;
+    margin-top: 15px;
+    padding-top: 0;
+    font-size: 0.82rem;
+    line-height: 1.9;
+    color: #475569;
 }
 
 /* ================================================================

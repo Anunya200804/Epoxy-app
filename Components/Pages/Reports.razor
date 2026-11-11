@@ -59,40 +59,318 @@
     </div>
 </div>
 
-<!-- Printable Report Frame (Styled for A4 paper preview) -->
-<div class="card-panel @(isPrinting ? "print-section" : "")" style="background-color: white; border: 1px solid #ddd; padding: 35px; border-radius: var(--radius-md);">
-    <!-- Report Title -->
-    <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom text-dark flex-wrap gap-2">
-        <div class="d-flex align-items-center gap-3">
-            <img src="images/logo.png" alt="Company Logo" style="height: 64px; width: 64px; object-fit: cover; border-radius: 8px; border: 1px solid #e2e8f0; box-shadow: 0 2px 6px rgba(0,0,0,0.06);" />
-            <div>
-                <h4 style="font-weight: 800; margin: 0; color: #0f2444; font-size: 1.25rem;">จัดการพื้น Epoxy ช่างแขก</h4>
-                <p style="margin: 2px 0 0 0; font-size: 0.82rem; color: #64748b;">ระบบรายงานและสรุปผลการปฏิบัติงานโครงการ</p>
-            </div>
-        </div>
-        <div class="text-end">
-            <h3 style="font-weight: 800; margin: 0; color: var(--primary); font-size: 1.35rem;">
-                @GetReportTitle()
-            </h3>
-            <p style="margin: 4px 0 0 0; font-size: 0.85rem; color: #475569;">
-                ช่วงวันที่: <strong>@startDate.ToString("dd MMMM yyyy")</strong> - <strong>@endDate.ToString("dd MMMM yyyy")</strong>
-            </p>
-            <span class="small text-muted no-print" style="font-size: 0.72rem;">พิมพ์เมื่อ: @DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss")</span>
-        </div>
-    </div>
+<!-- Printable Report Container -->
+<div class="@(isPrinting ? "print-section" : "")">
 
 <style>
-    /* Print Optimization Styles */
+    /* Formal Business Document Styles */
+    .doc-sheet {
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        border-radius: 4px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.07);
+        padding: 24px 28px;
+        margin-bottom: 28px;
+        max-width: 900px;
+        margin-left: auto;
+        margin-right: auto;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Sarabun", "TH Sarabun New", sans-serif;
+        color: #0f172a;
+        box-sizing: border-box;
+    }
+
+    .doc-header-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 8px;
+    }
+
+    .doc-header-table td {
+        vertical-align: top;
+        padding: 0;
+    }
+
+    .doc-logo-img {
+        height: 64px;
+        width: 64px;
+        object-fit: cover;
+        border-radius: 6px;
+        border: 1px solid #cbd5e1;
+        margin-right: 14px;
+    }
+
+    .doc-company-title {
+        font-size: 1.15rem;
+        font-weight: 800;
+        color: #0f2444;
+        margin: 0 0 2px 0;
+        line-height: 1.25;
+    }
+
+    .doc-company-info {
+        font-size: 0.76rem;
+        color: #475569;
+        margin: 0;
+        line-height: 1.45;
+    }
+
+    .doc-title-main {
+        font-size: 1.22rem;
+        font-weight: 800;
+        color: #0f2444;
+        margin: 0;
+        text-align: right;
+        line-height: 1.2;
+        white-space: nowrap;
+    }
+
+    .doc-title-en {
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: #1e40af;
+        letter-spacing: 0.8px;
+        text-align: right;
+        margin-bottom: 4px;
+        white-space: nowrap;
+    }
+
+    .doc-ref-table {
+        margin-left: auto;
+        border-collapse: collapse;
+        font-size: 0.76rem;
+    }
+
+    .doc-ref-table td {
+        padding: 1px 4px;
+        vertical-align: middle;
+    }
+
+    .doc-double-divider {
+        border-bottom: 2px solid #0f2444;
+        border-top: 1px solid #94a3b8;
+        height: 3px;
+        margin-bottom: 10px;
+    }
+
+    .doc-section-heading {
+        font-size: 0.82rem;
+        font-weight: 700;
+        color: #0f2444;
+        background-color: #f1f5f9;
+        padding: 4px 8px;
+        border: 1px solid #94a3b8;
+        border-bottom: none;
+        margin-top: 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .doc-grid-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.76rem;
+        border: 1px solid #94a3b8;
+        margin-bottom: 6px;
+    }
+
+    .doc-grid-table th, .doc-grid-table td {
+        border: 1px solid #94a3b8;
+        padding: 4px 7px;
+        vertical-align: middle;
+    }
+
+    .doc-grid-table th {
+        background-color: #f8fafc;
+        font-weight: 700;
+        color: #1e293b;
+        text-align: center;
+    }
+
+    .doc-cell-label {
+        background-color: #f8fafc;
+        font-weight: 600;
+        color: #334155;
+        width: 19%;
+    }
+
+    .doc-cell-value {
+        color: #0f172a;
+    }
+
+    /* 4-Step Audit Grid */
+    .doc-steps-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 6px;
+        margin-bottom: 6px;
+    }
+
+    .doc-step-box {
+        border: 1px solid #94a3b8;
+        background: #ffffff;
+        padding: 5px;
+        font-size: 0.72rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+
+    .doc-step-header {
+        font-weight: 700;
+        font-size: 0.74rem;
+        color: #0f2444;
+        border-bottom: 1px solid #e2e8f0;
+        padding-bottom: 3px;
+        margin-bottom: 4px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .doc-step-badge {
+        font-size: 0.65rem;
+        padding: 1px 4px;
+        border-radius: 2px;
+        font-weight: 600;
+    }
+
+    .badge-done { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+    .badge-wip  { background: #fef9c3; color: #854d0e; border: 1px solid #fef08a; }
+    .badge-wait { background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; }
+
+    .doc-step-photo {
+        height: 80px;
+        width: 100%;
+        object-fit: cover;
+        border: 1px solid #cbd5e1;
+        border-radius: 2px;
+        margin-bottom: 4px;
+        display: block;
+    }
+
+    .doc-step-no-photo {
+        height: 80px;
+        width: 100%;
+        border: 1px solid #e2e8f0;
+        background: #f8fafc;
+        color: #64748b;
+        font-size: 0.68rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        margin-bottom: 4px;
+        border-radius: 2px;
+    }
+
+    .doc-step-desc {
+        font-size: 0.7rem;
+        color: #334155;
+        line-height: 1.35;
+        min-height: 32px;
+        margin-bottom: 3px;
+        white-space: pre-line;
+    }
+
+    .doc-step-materials {
+        font-size: 0.67rem;
+        color: #475569;
+        border-top: 1px solid #f1f5f9;
+        padding-top: 2px;
+        line-height: 1.25;
+    }
+
+    /* Slips Attachment Row */
+    .doc-slips-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        border: 1px solid #94a3b8;
+        padding: 5px 8px;
+        background: #f8fafc;
+        margin-bottom: 6px;
+    }
+
+    .doc-slip-card {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .doc-slip-img {
+        height: 52px;
+        max-width: 80px;
+        object-fit: contain;
+        border: 1px solid #cbd5e1;
+        background: #fff;
+        border-radius: 2px;
+        cursor: pointer;
+    }
+
+    /* Certification Statement & Signatures */
+    .doc-cert-statement {
+        font-size: 0.72rem;
+        color: #334155;
+        line-height: 1.4;
+        border: 1px solid #94a3b8;
+        padding: 5px 8px;
+        background: #f8fafc;
+        margin-top: 4px;
+        margin-bottom: 6px;
+    }
+
+    .doc-signature-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 4px;
+    }
+
+    .doc-signature-table td {
+        width: 50%;
+        text-align: center;
+        vertical-align: top;
+        padding: 3px 12px;
+    }
+
+    .doc-sig-role {
+        font-weight: 700;
+        font-size: 0.76rem;
+        color: #0f2444;
+        margin-bottom: 26px;
+    }
+
+    .doc-sig-dots {
+        border-top: 1px solid #475569;
+        width: 200px;
+        margin: 0 auto;
+        padding-top: 3px;
+        font-size: 0.72rem;
+        line-height: 1.45;
+    }
+
+    /* Footer */
+    .doc-footer-bar {
+        border-top: 1px solid #94a3b8;
+        padding-top: 3px;
+        margin-top: 6px;
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.67rem;
+        color: #64748b;
+    }
+
+    /* Print Specific Media Query */
     @@media print {
         @@page {
             size: A4 portrait;
-            margin: 8mm 10mm 10mm 10mm;
+            margin: 6mm 8mm 6mm 8mm;
         }
 
         html, body {
             background: #ffffff !important;
             color: #000000 !important;
-            font-size: 9.5pt !important;
+            font-size: 8pt !important;
             margin: 0 !important;
             padding: 0 !important;
             -webkit-print-color-adjust: exact !important;
@@ -103,102 +381,41 @@
             display: none !important;
         }
 
-        .card-panel {
-            border: none !important;
-            box-shadow: none !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            background: transparent !important;
-        }
-
-        /* Prevent ugly page breaks and splitting */
-        .project-dossier-card {
+        .doc-sheet {
             page-break-inside: avoid !important;
             break-inside: avoid !important;
             page-break-after: always !important;
             break-after: page !important;
-            border: 1px solid #94a3b8 !important;
-            border-radius: 6px !important;
-            padding: 14px !important;
-            margin-bottom: 0 !important;
-            background: #ffffff !important;
+            border: 1px solid #334155 !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            padding: 6mm 8mm 5mm 8mm !important;
+            margin: 0 0 0 0 !important;
+            width: 100% !important;
+            max-width: none !important;
             box-sizing: border-box !important;
         }
 
-        .project-dossier-card:last-child {
+        .doc-sheet:last-child {
             page-break-after: auto !important;
             break-after: auto !important;
         }
 
-        .dossier-meta-grid {
-            display: grid !important;
-            grid-template-columns: 1.1fr 0.9fr !important;
-            gap: 12px !important;
-            margin-bottom: 12px !important;
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
+        .doc-step-photo {
+            height: 72px !important;
         }
 
-        .dossier-steps-grid {
-            display: grid !important;
-            grid-template-columns: 1fr 1fr 1fr 1fr !important;
-            gap: 8px !important;
-            margin-bottom: 12px !important;
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
+        .doc-step-no-photo {
+            height: 72px !important;
         }
 
-        .step-card-box {
-            border: 1px solid #cbd5e1 !important;
-            border-radius: 6px !important;
-            padding: 8px !important;
-            background: #f8fafc !important;
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
-            font-size: 0.75rem !important;
-        }
-
-        .step-photo-img {
-            width: 100% !important;
-            height: 90px !important;
-            max-height: 90px !important;
-            object-fit: cover !important;
-            border-radius: 4px !important;
-            border: 1px solid #cbd5e1 !important;
-        }
-
-        .slip-photo-img {
-            max-height: 75px !important;
-            height: 75px !important;
-            object-fit: contain !important;
-        }
-
-        .step-desc-text {
-            font-size: 0.72rem !important;
-            padding: 4px !important;
-            min-height: auto !important;
-            line-height: 1.3 !important;
-        }
-
-        .dossier-signatures-box {
-            display: grid !important;
-            grid-template-columns: 1fr 1fr !important;
-            gap: 20px !important;
-            margin-top: 10px !important;
-            padding-top: 10px !important;
-            border-top: 1px solid #cbd5e1 !important;
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
-            font-size: 0.8rem !important;
-        }
-
-        .dossier-signatures-box p {
-            margin-bottom: 30px !important;
+        .doc-sig-role {
+            margin-bottom: 22px !important;
         }
     }
 </style>
 
-    <!-- 1. All-in-One Comprehensive Dossier (ใบเสนอราคา + สลิปการเงิน + รูปภาพงาน 4 ขั้นตอน) -->
+    <!-- 1. All-in-One Comprehensive Dossier (แบบฟอร์มเอกสารรายงานสรุปผลและส่งมอบงานโครงการ) -->
     @if (reportType == "AllInOne" || reportType == "Project")
     {
         @if (dossierReport.Any())
@@ -209,266 +426,370 @@
                 var proj = item.Project;
                 var stepList = item.StepDetails;
 
-                <div class="project-dossier-card mb-5 text-dark" style="border: 1px solid #cbd5e1; border-radius: 12px; padding: 20px; background: #fff;">
-                    <!-- Dossier Header -->
-                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary); padding-bottom: 10px; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
-                        <div>
-                            <h3 style="margin: 0; color: var(--primary); font-weight: 700; font-size: 1.25rem;">
-                                <i class="bi bi-building"></i> ใบเสนอราคา QT-@q.Id @(proj != null ? $" / โครงการ PROJ-{proj.Id}" : "")
-                            </h3>
-                            <span style="font-size: 0.9rem; color: #475569; font-weight: 500;">
-                                ลักษณะงาน: @q.JobDescription
-                            </span>
-                        </div>
-                        <div style="display: flex; gap: 8px; align-items: center;">
-                            <span class="badge-status badge-@q.Status.ToString().ToLower()" style="font-size: 0.82rem; padding: 4px 10px;">
-                                <i class="bi bi-file-earmark-check"></i> @GetQuotationStatusName(q.Status)
-                            </span>
-                            @if (proj != null)
-                            {
-                                <span class="badge-status badge-@GetStepBadgeClass(proj.StepStatus)" style="font-size: 0.82rem; padding: 4px 10px;">
-                                    <i class="bi bi-activity"></i> ขั้นตอน: @GetStepName(proj.StepStatus)
-                                </span>
-                                <span class="badge-status badge-@proj.PaymentStatus.ToString().ToLower()" style="font-size: 0.82rem; padding: 4px 10px;">
-                                    <i class="bi bi-wallet2"></i> @GetPaymentStatusText(proj.PaymentStatus)
-                                </span>
-                            }
-                        </div>
-                    </div>
+                <div class="doc-sheet text-dark">
+                    <!-- Letterhead Header -->
+                    <table class="doc-header-table">
+                        <tr>
+                            <td style="width: 58%;">
+                                <div style="display: flex; align-items: center;">
+                                    <img src="images/logo.png" alt="Company Logo" class="doc-logo-img" />
+                                    <div>
+                                        <h3 class="doc-company-title">@companyConfig.Name</h3>
+                                        <p class="doc-company-info">
+                                            @companyConfig.Address<br />
+                                            โทร: @companyConfig.Phone | อีเมล: @companyConfig.Email<br />
+                                            <span style="white-space: nowrap;">เลขประจำตัวผู้เสียภาษี: @companyConfig.TaxId</span>
+                                        </p>
+                                    </div>
+                                </div>
+                            </td>
+                            <td style="width: 42%; text-align: right;">
+                                <h2 class="doc-title-main">รายงานสรุปโครงการและส่งมอบงาน</h2>
+                                <div class="doc-title-en">PROJECT COMPLETION & HANDOVER REPORT</div>
+                                <table class="doc-ref-table">
+                                    <tr>
+                                        <td style="text-align: right; color: #475569;">เลขที่เอกสาร:</td>
+                                        <td style="text-align: left; font-weight: 700; color: #0f2444;">REP-QT-@q.Id</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="text-align: right; color: #475569;">วันที่จัดทำเอกสาร:</td>
+                                        <td style="text-align: left;">@DateTime.Today.ToString("dd/MM/yyyy")</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="text-align: right; color: #475569;">อ้างอิงใบเสนอราคา:</td>
+                                        <td style="text-align: left; font-weight: 600;">QT-@q.Id</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="text-align: right; color: #475569;">สถานะโครงการ:</td>
+                                        <td style="text-align: left; font-weight: 600; color: @(proj?.StepStatus == InstallationStep.Completed ? "#15803d" : "#0284c7");">
+                                            @(proj != null ? GetStepName(proj.StepStatus) : GetQuotationStatusName(q.Status))
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
 
-                    <!-- 2 Columns: Quotation & Slip Info -->
-                    <div class="dossier-meta-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-bottom: 18px;">
-                        <!-- Column 1: ข้อมูลใบเสนอราคาและลูกค้า -->
-                        <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px; background-color: #f8fafc;">
-                            <h5 style="margin: 0 0 8px 0; color: var(--primary); font-weight: 700; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; font-size: 0.92rem;">
-                                <i class="bi bi-file-earmark-text"></i> ข้อมูลใบเสนอราคาและลูกค้า
-                            </h5>
-                            <div style="font-size: 0.84rem; line-height: 1.6; color: #334155;">
-                                <div><strong>เลขที่ใบเสนอราคา:</strong> QT-@q.Id</div>
-                                <div><strong>ชื่อลูกค้า:</strong> @(q.Customer?.Name ?? "-")</div>
-                                <div><strong>เบอร์โทรศัพท์:</strong> @(q.Customer?.Phone ?? "-")</div>
-                                <div><strong>ที่อยู่หน้างาน:</strong> @(q.Customer?.Address ?? "-")</div>
-                                <div><strong>พื้นที่ดำเนินการ:</strong> @q.AreaSqm.ToString("N0") ตร.ม. (ราคา ฿@q.PricePerUnit.ToString("N0") / ตร.ม.)</div>
-                                <div><strong>วันที่ออกใบเสนอราคา:</strong> @q.CreatedDate.ToString("dd MMMM yyyy")</div>
-                                @if (proj != null)
-                                {
-                                    <div><strong>ทีมช่างผู้รับผิดชอบ:</strong> @(proj.TechnicianTeam?.TeamName ?? "ยังไม่ได้ระบุทีม") (หัวหน้า: @(proj.TechnicianTeam?.LeaderName ?? "-"))</div>
-                                }
-                                <div style="margin-top: 6px; padding-top: 6px; border-top: 1px dashed #cbd5e1;">
-                                    <div><strong>ราคารวมโครงการทั้งสิ้น:</strong> <span style="font-weight: 700; color: var(--primary); font-size: 0.92rem;">฿@q.TotalPrice.ToString("N0")</span></div>
-                                    <div><strong>ยอดมัดจำที่ชำระแล้ว:</strong> <span style="font-weight: 700; color: #16a34a;">฿@q.DepositAmount.ToString("N0")</span></div>
-                                    <div><strong>ยอดคงเหลือชำระงวดสุดท้าย:</strong> <span style="font-weight: 700; color: @(proj?.PaymentStatus == PaymentStatus.Paid ? "#16a34a" : "#ea580c");">฿@q.BalanceAmount.ToString("N0")</span></div>
-                                    @if (proj != null && proj.EndDate.HasValue)
+                    <div class="doc-double-divider"></div>
+
+                    <!-- ๑. ข้อมูลโครงการและผู้ว่าจ้าง -->
+                    <div class="doc-section-heading">
+                        <span>๑. ข้อมูลโครงการและผู้ว่าจ้าง (Project & Customer Information)</span>
+                        <span style="font-size: 0.7rem; font-weight: normal; color: #475569;">สัญญาเลขที่: QT-@q.Id</span>
+                    </div>
+                    <table class="doc-grid-table">
+                        <tbody>
+                            <tr>
+                                <td class="doc-cell-label">ลักษณะงาน / โครงการ</td>
+                                <td class="doc-cell-value" colspan="3"><strong>@q.JobDescription</strong></td>
+                            </tr>
+                            <tr>
+                                <td class="doc-cell-label">ผู้ว่าจ้าง (ลูกค้า)</td>
+                                <td class="doc-cell-value" style="width: 31%;">@(q.Customer?.Name ?? "-")</td>
+                                <td class="doc-cell-label" style="width: 18%;">เบอร์โทรศัพท์ / LINE</td>
+                                <td class="doc-cell-value" style="width: 32%;">@(q.Customer?.Phone ?? "-") @(!string.IsNullOrEmpty(q.Customer?.LineId) ? $" (LINE: {q.Customer.LineId})" : "")</td>
+                            </tr>
+                            <tr>
+                                <td class="doc-cell-label">สถานที่ติดตั้ง (หน้างาน)</td>
+                                <td class="doc-cell-value" colspan="3">@(q.Customer?.Address ?? "-")</td>
+                            </tr>
+                            <tr>
+                                <td class="doc-cell-label">พื้นที่ดำเนินการ</td>
+                                <td class="doc-cell-value">@q.AreaSqm.ToString("N0") ตารางเมตร (ราคา ฿@q.PricePerUnit.ToString("N0") / ตร.ม.)</td>
+                                <td class="doc-cell-label">ทีมช่างผู้รับผิดชอบ</td>
+                                <td class="doc-cell-value">@(proj?.TechnicianTeam?.TeamName ?? "ช่างผู้ชำนาญการ") (หัวหน้าช่าง: @(proj?.TechnicianTeam?.LeaderName ?? "-"))</td>
+                            </tr>
+                            <tr>
+                                <td class="doc-cell-label">วันที่ออกเอกสารสัญญา</td>
+                                <td class="doc-cell-value">@q.CreatedDate.ToString("dd MMMM yyyy")</td>
+                                <td class="doc-cell-label">ระยะเวลาดำเนินงาน</td>
+                                <td class="doc-cell-value">@(proj != null ? proj.StartDate.ToString("dd/MM/yyyy") : "-") ถึง @(proj?.EndDate.HasValue == true ? proj.EndDate.Value.ToString("dd/MM/yyyy") : "ตามกำหนดการ")</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <!-- ๒. สรุปรายการบัญชีและการชำระเงิน -->
+                    <div class="doc-section-heading">
+                        <span>๒. สรุปรายการบัญชีและการชำระเงิน (Financial & Payment Statement)</span>
+                        <span style="font-size: 0.7rem; font-weight: normal; color: #475569;">สถานะ: @GetPaymentStatusText(proj?.PaymentStatus ?? PaymentStatus.Pending)</span>
+                    </div>
+                    <table class="doc-grid-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 6%;">ลำดับ</th>
+                                <th>รายการทางการเงิน</th>
+                                <th style="width: 18%; text-align: right;">จำนวนเงิน (บาท)</th>
+                                <th style="width: 30%;">สถานะการชำระ / วันที่บันทึก</th>
+                                <th style="width: 18%;">หลักฐานการเงิน</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="text-align: center;">1</td>
+                                <td>ค่าบริการติดตั้งพื้น Epoxy ทั้งหมดตามสัญญา</td>
+                                <td style="text-align: right; font-weight: 600;">฿@q.TotalPrice.ToString("N0")</td>
+                                <td>ตามใบเสนอราคา (@GetQuotationStatusName(q.Status))</td>
+                                <td style="text-align: center; color: #475569;">สัญญา QT-@q.Id</td>
+                            </tr>
+                            <tr>
+                                <td style="text-align: center;">2</td>
+                                <td>หัก: เงินมัดจำงวดที่ 1 (ก่อนเริ่มดำเนินการ)</td>
+                                <td style="text-align: right; color: #15803d; font-weight: 600;">- ฿@q.DepositAmount.ToString("N0")</td>
+                                <td>
+                                    ชำระแล้ว @(q.ApprovedDate.HasValue ? $"({q.ApprovedDate.Value:dd/MM/yyyy})" : "")
+                                    @if (!string.IsNullOrEmpty(q.ApprovedBy))
                                     {
-                                        <div style="margin-top: 3px; font-size: 0.8rem;">
-                                            <strong>กำหนดชำระภายใน 7 วัน:</strong> @proj.DueDate?.ToString("dd/MM/yyyy")
-                                            @if (proj.PaymentStatus == PaymentStatus.Pending)
-                                            {
-                                                @if (proj.OverdueDays > 0)
-                                                {
-                                                    <span style="color: #dc2626; font-weight: 700; display: block;">
-                                                        ⚠️ เกินกำหนด @proj.OverdueDays วัน (ค่าปรับ 3%/วัน: +฿@proj.LatePenaltyAmount.ToString("N0") ➔ ยอดสุทธิ ฿@proj.TotalPayableAmount.ToString("N0"))
-                                                    </span>
-                                                }
-                                                else
-                                                {
-                                                    <span style="color: #0284c7; font-weight: 600;"> (เหลือเวลาอีก @proj.DaysRemaining วัน)</span>
-                                                }
-                                            }
-                                        </div>
+                                        <span style="font-size: 0.68rem; color: #64748b; display: block;">อนุมัติโดย: @q.ApprovedBy</span>
                                     }
-                                </div>
-                            </div>
-                        </div>
+                                </td>
+                                <td style="text-align: center;">
+                                    @if (!string.IsNullOrEmpty(q.PaymentSlipUrl))
+                                    {
+                                        <span style="color: #1d4ed8; font-weight: 600;">[ มีสลิปแนบท้าย ]</span>
+                                    }
+                                    else
+                                    {
+                                        <span style="color: #94a3b8;">ไม่มีเอกสารแนบ</span>
+                                    }
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="text-align: center;">3</td>
+                                <td>
+                                    ยอดคงเหลือชำระงวดสุดท้าย (งวดส่งมอบงาน)
+                                    @if (proj != null && proj.OverdueDays > 0 && proj.PaymentStatus == PaymentStatus.Pending)
+                                    {
+                                        <span style="color: #b91c1c; font-size: 0.68rem; display: block;">
+                                            (เกินกำหนด @proj.OverdueDays วัน ค่าปรับ 3%/วัน: +฿@proj.LatePenaltyAmount.ToString("N0"))
+                                        </span>
+                                    }
+                                </td>
+                                <td style="text-align: right; font-weight: 700; color: @(proj?.PaymentStatus == PaymentStatus.Paid ? "#15803d" : "#b45309");">
+                                    ฿@((proj != null && proj.OverdueDays > 0 && proj.PaymentStatus == PaymentStatus.Pending) ? proj.TotalPayableAmount.ToString("N0") : q.BalanceAmount.ToString("N0"))
+                                </td>
+                                <td>
+                                    @if (proj?.PaymentStatus == PaymentStatus.Paid)
+                                    {
+                                        <span style="color: #15803d; font-weight: 600;">ชำระครบถ้วนแล้ว</span>
+                                        @if (proj.PaymentDate.HasValue)
+                                        {
+                                            <span style="font-size: 0.68rem; color: #64748b; display: block;">วันที่: @proj.PaymentDate.Value.ToString("dd/MM/yyyy HH:mm")</span>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <span style="color: #b45309; font-weight: 600;">รอการชำระเงิน</span>
+                                        @if (proj?.DueDate.HasValue == true)
+                                        {
+                                            <span style="font-size: 0.68rem; color: #64748b; display: block;">(กำหนดภายใน 7 วัน: @proj.DueDate.Value.ToString("dd/MM/yyyy"))</span>
+                                        }
+                                    }
+                                </td>
+                                <td style="text-align: center;">
+                                    @if (proj != null && !string.IsNullOrEmpty(proj.FinalPaymentSlipUrl))
+                                    {
+                                        <span style="color: #1d4ed8; font-weight: 600;">[ มีสลิปแนบท้าย ]</span>
+                                    }
+                                    else
+                                    {
+                                        <span style="color: #94a3b8;">@(proj?.PaymentStatus == PaymentStatus.Paid ? "ไม่มีเอกสารแนบ" : "-")</span>
+                                    }
+                                </td>
+                            </tr>
+                        </tbody>
+                        <tfoot>
+                            <tr style="background-color: #f8fafc; font-weight: bold;">
+                                <td colspan="2" style="text-align: right;">สรุปยอดบัญชีสุทธิ:</td>
+                                <td colspan="3" style="text-align: left; padding-left: 10px;">
+                                    @if (proj?.PaymentStatus == PaymentStatus.Paid)
+                                    {
+                                        <span style="color: #15803d;">✔ ได้รับชำระเงินครบถ้วนสมบูรณ์แล้วทั้งสิ้น ฿@q.TotalPrice.ToString("N0")</span>
+                                    }
+                                    else
+                                    {
+                                        <span style="color: #b45309;">ยอดคงค้างรอชำระงวดสุดท้าย: ฿@((proj != null && proj.OverdueDays > 0) ? proj.TotalPayableAmount.ToString("N0") : q.BalanceAmount.ToString("N0"))</span>
+                                    }
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
 
-                        <!-- Column 2: สลิปการเงินและหลักฐานการชำระเงิน -->
-                        <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px; background-color: #f8fafc;">
-                            <h5 style="margin: 0 0 8px 0; color: var(--primary); font-weight: 700; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; font-size: 0.92rem;">
-                                <i class="bi bi-receipt"></i> สลิปการเงินและหลักฐานการชำระ
-                            </h5>
-                            <div style="font-size: 0.84rem; line-height: 1.6; color: #334155;">
-                                <div><strong>สถานะใบเสนอราคา:</strong> <span class="badge-status badge-@q.Status.ToString().ToLower()">@GetQuotationStatusName(q.Status)</span></div>
-                                <div><strong>ผู้อนุมัติมัดจำ:</strong> @(string.IsNullOrEmpty(q.ApprovedBy) ? "-" : q.ApprovedBy) (@(q.ApprovedDate?.ToString("dd/MM/yyyy HH:mm") ?? "-"))</div>
-                                @if (proj != null && !string.IsNullOrEmpty(proj.FinalPaymentApprovedBy))
-                                {
-                                    <div><strong>ผู้รับเงินงวดสุดท้าย:</strong> @proj.FinalPaymentApprovedBy (@(proj.PaymentDate?.ToString("dd/MM/yyyy HH:mm") ?? "-"))</div>
-                                }
-                                @if (proj != null && !string.IsNullOrEmpty(proj.FinalPaymentNote))
-                                {
-                                    <div><strong>หมายเหตุงวดสุดท้าย:</strong> @proj.FinalPaymentNote</div>
-                                }
-
-                                <!-- Grid of Slips -->
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px;">
-                                    <!-- 1. Deposit Slip -->
-                                    <div style="text-align: center; background: #fff; padding: 6px; border-radius: 6px; border: 1px solid #e2e8f0;">
-                                        <div style="font-weight: 600; font-size: 0.78rem; color: #059669; margin-bottom: 3px;">1. สลิปเงินมัดจำ</div>
-                                        @if (!string.IsNullOrEmpty(q.PaymentSlipUrl))
-                                        {
-                                            <img src="@q.PaymentSlipUrl" 
-                                                 alt="สลิปมัดจำ" 
-                                                 class="slip-photo-img"
-                                                 style="max-height: 100px; max-width: 100%; object-fit: contain; border-radius: 4px; border: 1px solid #cbd5e1; cursor: pointer;"
-                                                 title="คลิกเพื่อดูรูปขยาย"
-                                                 @onclick="@(() => OpenImageModal(q.PaymentSlipUrl, $"สลิปเงินมัดจำ QT-{q.Id}"))" />
-                                            <div class="no-print" style="font-size: 0.68rem; color: #64748b; margin-top: 2px;">(คลิกดูภาพขยาย)</div>
-                                        }
-                                        else
-                                        {
-                                            <div style="height: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #94a3b8; font-size: 0.72rem;">
-                                                <i class="bi bi-image" style="font-size: 1.2rem; margin-bottom: 2px;"></i>
-                                                <span>ไม่มีสลิปมัดจำ</span>
-                                            </div>
-                                        }
-                                    </div>
-
-                                    <!-- 2. Final Payment Slip -->
-                                    <div style="text-align: center; background: #fff; padding: 6px; border-radius: 6px; border: 1px solid #e2e8f0;">
-                                        <div style="font-weight: 600; font-size: 0.78rem; color: #16a34a; margin-bottom: 3px;">2. สลิปงวดสุดท้าย</div>
-                                        @if (proj != null && !string.IsNullOrEmpty(proj.FinalPaymentSlipUrl))
-                                        {
-                                            <img src="@proj.FinalPaymentSlipUrl" 
-                                                 alt="สลิปงวดสุดท้าย" 
-                                                 class="slip-photo-img"
-                                                 style="max-height: 100px; max-width: 100%; object-fit: contain; border-radius: 4px; border: 1px solid #cbd5e1; cursor: pointer;"
-                                                 title="คลิกเพื่อดูรูปขยาย"
-                                                 @onclick="@(() => OpenImageModal(proj.FinalPaymentSlipUrl, $"สลิปงวดสุดท้าย PROJ-{proj.Id}"))" />
-                                            <div class="no-print" style="font-size: 0.68rem; color: #64748b; margin-top: 2px;">(คลิกดูภาพขยาย)</div>
-                                        }
-                                        else
-                                        {
-                                            <div style="height: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #94a3b8; font-size: 0.72rem;">
-                                                <i class="bi bi-wallet" style="font-size: 1.2rem; margin-bottom: 2px;"></i>
-                                                <span>@(proj?.PaymentStatus == PaymentStatus.Paid ? "ไม่มีการแนบสลิป" : "ยังไม่ได้รับชำระ")</span>
-                                            </div>
-                                        }
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                    <!-- ๓. บันทึกผลการปฏิบัติงาน 4 ขั้นตอนและภาพถ่ายหน้างาน -->
+                    <div class="doc-section-heading">
+                        <span>๓. บันทึกผลการปฏิบัติงานจริงและหลักฐานภาพถ่าย (Work Execution & Inspection Records)</span>
+                        <span style="font-size: 0.7rem; font-weight: normal; color: #475569;">มาตรฐาน 4 ขั้นตอน</span>
                     </div>
-
-                    <!-- Step-by-Step Progress with Photos -->
-                    <h5 style="margin: 0 0 12px 0; font-weight: 700; color: var(--primary); border-left: 4px solid var(--primary); padding-left: 8px; font-size: 0.95rem;">
-                        <i class="bi bi-images"></i> รูปภาพและรายละเอียดขั้นตอนการทำงานจริง (4 ขั้นตอน)
-                    </h5>
-
-                    <div class="dossier-steps-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 16px;">
+                    <div class="doc-steps-grid">
                         @foreach (var step in Enum.GetValues<InstallationStep>())
                         {
                             var stepDetail = stepList.FirstOrDefault(d => d.Step == step);
                             var isStepReached = proj != null && proj.StepStatus >= step;
 
-                            <div class="step-card-box" style="border: 1px solid @(isStepReached ? "#22c55e" : "#e2e8f0"); border-radius: 8px; padding: 10px; background: @(isStepReached ? "#f0fdf4" : "#f8fafc"); display: flex; flex-direction: column; justify-content: space-between;">
+                            <div class="doc-step-box">
                                 <div>
-                                    <!-- Step Title -->
-                                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid @(isStepReached ? "#bbf7d0" : "#e2e8f0"); padding-bottom: 4px; margin-bottom: 8px;">
-                                        <h6 style="margin: 0; font-weight: 700; font-size: 0.85rem; color: @(isStepReached ? "#166534" : "#64748b");">
-                                            @GetStepName(step)
-                                        </h6>
-                                        <span style="font-size: 0.68rem; font-weight: 700; padding: 2px 6px; border-radius: 10px; background: @(isStepReached ? "#dcfce7" : "#f1f5f9"); color: @(isStepReached ? "#15803d" : "#94a3b8");">
-                                            @(isStepReached ? (proj!.StepStatus == step ? "กำลังทำ" : "เสร็จแล้ว") : "ยังไม่เริ่ม")
+                                    <div class="doc-step-header">
+                                        <span>@GetStepName(step)</span>
+                                        <span class="doc-step-badge @(isStepReached ? (proj!.StepStatus == step ? "badge-wip" : "badge-done") : "badge-wait")">
+                                            @(isStepReached ? (proj!.StepStatus == step ? "กำลังทำ" : "เสร็จสิ้น") : "รอเริ่ม")
                                         </span>
                                     </div>
 
-                                    <!-- Step Photo -->
-                                    <div style="text-align: center; margin-bottom: 8px;">
-                                        @if (stepDetail != null && !string.IsNullOrEmpty(stepDetail.PhotoUrl))
-                                        {
-                                            <img src="@stepDetail.PhotoUrl" 
-                                                 alt="ภาพขั้นตอน @GetStepName(step)" 
-                                                 class="step-photo-img"
-                                                 style="width: 100%; height: 130px; object-fit: cover; border-radius: 6px; border: 1px solid #cbd5e1; cursor: pointer;"
-                                                 title="คลิกเพื่อดูรูปขยาย"
-                                                 @onclick="@(() => OpenImageModal(stepDetail.PhotoUrl, $"ภาพขั้นตอน: {GetStepName(step)} (QT-{q.Id})"))" />
-                                            <div class="no-print" style="font-size: 0.68rem; color: #64748b; margin-top: 2px;">(คลิกดูภาพขยาย)</div>
-                                        }
-                                        else
-                                        {
-                                            <div style="height: 90px; background: #fff; border: 1px dashed #cbd5e1; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #94a3b8; font-size: 0.75rem;">
-                                                <i class="bi bi-camera" style="font-size: 1.3rem; margin-bottom: 2px;"></i>
-                                                <span>ยังไม่มีรูปภาพ</span>
-                                            </div>
-                                        }
-                                    </div>
-
-                                    <!-- Step Description & Materials -->
-                                    <div style="font-size: 0.78rem; line-height: 1.4; color: #334155;">
-                                        <div>
-                                            <strong>รายละเอียดงาน:</strong>
-                                            <div class="step-desc-text" style="color: #475569; margin-top: 2px; white-space: pre-line; background: #fff; padding: 4px 6px; border-radius: 4px; border: 1px solid #e2e8f0; min-height: 32px;">
-                                                @(stepDetail != null && !string.IsNullOrWhiteSpace(stepDetail.Description) ? stepDetail.Description : "ไม่มีบันทึกรายละเอียด")
-                                            </div>
+                                    @if (stepDetail != null && !string.IsNullOrEmpty(stepDetail.PhotoUrl))
+                                    {
+                                        <img src="@stepDetail.PhotoUrl" 
+                                             alt="ภาพขั้นตอน @GetStepName(step)" 
+                                             class="doc-step-photo"
+                                             title="คลิกเพื่อดูรูปขยาย"
+                                             @onclick="@(() => OpenImageModal(stepDetail.PhotoUrl, $"ภาพขั้นตอน: {GetStepName(step)} (QT-{q.Id})"))" />
+                                    }
+                                    else
+                                    {
+                                        <div class="doc-step-no-photo">
+                                            <span>[ ไม่มีภาพบันทึกในขั้นตอนนี้ ]</span>
                                         </div>
+                                    }
 
-                                        <div style="margin-top: 6px;">
-                                            <strong>วัสดุอุปกรณ์ที่ใช้:</strong>
-                                            @if (stepDetail != null && stepDetail.UsedMaterials != null && stepDetail.UsedMaterials.Any())
-                                            {
-                                                <ul style="margin: 2px 0 0 0; padding-left: 14px; color: #475569; font-size: 0.75rem;">
-                                                    @foreach (var mat in stepDetail.UsedMaterials)
-                                                    {
-                                                        <li>@mat.Inventory?.Name (@mat.QuantityUsed.ToString("N1") @mat.Inventory?.Unit)</li>
-                                                    }
-                                                </ul>
-                                            }
-                                            else
-                                            {
-                                                <span style="color: #94a3b8; margin-left: 4px;">ไม่มีการใช้วัสดุ</span>
-                                            }
-                                        </div>
+                                    <div class="doc-step-desc">
+                                        @(stepDetail != null && !string.IsNullOrWhiteSpace(stepDetail.Description) ? stepDetail.Description : "ตามมาตรฐานงานติดตั้ง")
                                     </div>
+                                </div>
+
+                                <div class="doc-step-materials">
+                                    <strong>วัสดุ:</strong>
+                                    @if (stepDetail != null && stepDetail.UsedMaterials != null && stepDetail.UsedMaterials.Any())
+                                    {
+                                        <span>@string.Join(", ", stepDetail.UsedMaterials.Select(m => $"{m.Inventory?.Name} ({m.QuantityUsed:N1} {m.Inventory?.Unit})"))</span>
+                                    }
+                                    else
+                                    {
+                                        <span>ไม่มีการเบิกเพิ่ม</span>
+                                    }
                                 </div>
                             </div>
                         }
                     </div>
 
-                    <!-- Signatures Section per Job -->
-                    <div class="dossier-signatures-box" style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; text-align: center; margin-top: 20px; border-top: 1px solid #e2e8f0; padding-top: 16px; font-size: 0.82rem; color: #334155;">
-                        <div>
-                            <p style="margin-bottom: 35px; font-weight: 600;">ผู้เสนอราคา / ผู้ควบคุมงาน</p>
-                            <div style="border-top: 1px solid #64748b; width: 200px; margin: auto; padding-top: 4px;">
-                                ลงชื่อ......................................................<br />
-                                ( @(proj?.TechnicianTeam?.LeaderName ?? AuthService.CurrentUser?.FullName ?? "ผู้รับมอบอำนาจ") )<br />
-                                วันที่ ......./......./.......
+                    <!-- หลักฐานสลิปการเงินแนบท้าย (ถ้ามี) -->
+                    @if (!string.IsNullOrEmpty(q.PaymentSlipUrl) || (proj != null && !string.IsNullOrEmpty(proj.FinalPaymentSlipUrl)))
+                    {
+                        <div class="doc-slips-grid">
+                            <div class="doc-slip-card">
+                                @if (!string.IsNullOrEmpty(q.PaymentSlipUrl))
+                                {
+                                    <img src="@q.PaymentSlipUrl" class="doc-slip-img" alt="สลิปมัดจำ" @onclick="@(() => OpenImageModal(q.PaymentSlipUrl, $"สลิปมัดจำ QT-{q.Id}"))" />
+                                    <div style="font-size: 0.7rem; color: #334155; line-height: 1.3;">
+                                        <strong>หลักฐานมัดจำ:</strong> ฿@q.DepositAmount.ToString("N0")<br />
+                                        <span style="font-size: 0.65rem; color: #64748b;">@(q.ApprovedDate.HasValue ? $"อนุมัติเมื่อ {q.ApprovedDate.Value:dd/MM/yyyy HH:mm}" : "มีเอกสารแนบ")</span>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div style="font-size: 0.7rem; color: #94a3b8;">[ ไม่มีเอกสารสลิปมัดจำ ]</div>
+                                }
+                            </div>
+                            <div class="doc-slip-card">
+                                @if (proj != null && !string.IsNullOrEmpty(proj.FinalPaymentSlipUrl))
+                                {
+                                    <img src="@proj.FinalPaymentSlipUrl" class="doc-slip-img" alt="สลิปงวดสุดท้าย" @onclick="@(() => OpenImageModal(proj.FinalPaymentSlipUrl, $"สลิปงวดสุดท้าย PROJ-{proj.Id}"))" />
+                                    <div style="font-size: 0.7rem; color: #334155; line-height: 1.3;">
+                                        <strong>หลักฐานงวดสุดท้าย:</strong> ฿@q.BalanceAmount.ToString("N0")<br />
+                                        <span style="font-size: 0.65rem; color: #64748b;">@(proj.PaymentDate.HasValue ? $"รับชำระเมื่อ {proj.PaymentDate.Value:dd/MM/yyyy HH:mm}" : "มีเอกสารแนบ")</span>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div style="font-size: 0.7rem; color: #94a3b8;">@(proj?.PaymentStatus == PaymentStatus.Paid ? "[ ได้รับชำระแล้ว - ไม่ได้แนบสลิป ]" : "[ รอการชำระเงินงวดสุดท้าย ]")</div>
+                                }
                             </div>
                         </div>
-                        <div>
-                            <p style="margin-bottom: 35px; font-weight: 600;">ลูกค้า / ผู้ตรวจรับงาน</p>
-                            <div style="border-top: 1px solid #64748b; width: 200px; margin: auto; padding-top: 4px;">
-                                ลงชื่อ......................................................<br />
-                                ( @(q.Customer?.Name ?? "ลูกค้าผู้ว่าจ้าง") )<br />
-                                วันที่ ......./......./.......
-                            </div>
-                        </div>
+                    }
+
+                    <!-- ๔. ข้อความรับรองและการลงนามตรวจรับมอบงาน -->
+                    <div class="doc-cert-statement">
+                        <strong>บันทึกรับรองการส่งมอบและตรวจรับงาน:</strong> ข้าพเจ้าทั้งสองฝ่ายได้ร่วมกันตรวจสอบผลการปฏิบัติงานติดตั้งพื้นผิว Epoxy ในสถานที่จริงตามขั้นตอนและขอบเขตงานที่ระบุข้างต้นเรียบร้อยแล้ว งานมีความประณีต ถูกต้อง ครบถ้วนตามมาตรฐานและข้อตกลงทุกประการ จึงลงลายมือชื่อไว้เป็นหลักฐานสำคัญต่อกัน
+                    </div>
+
+                    <table class="doc-signature-table">
+                        <tr>
+                            <td>
+                                <div class="doc-sig-role">ผู้ส่งมอบงาน / ผู้ควบคุมงาน</div>
+                                <div class="doc-sig-dots">
+                                    ลงชื่อ ................................................................<br />
+                                    ( @(proj?.TechnicianTeam?.LeaderName ?? AuthService.CurrentUser?.FullName ?? "ผู้แทนบริษัทฯ") )<br />
+                                    วันที่ ......... / ......... / .................
+                                </div>
+                            </td>
+                            <td>
+                                <div class="doc-sig-role">ผู้ตรวจรับมอบงาน / ผู้ว่าจ้าง</div>
+                                <div class="doc-sig-dots">
+                                    ลงชื่อ ................................................................<br />
+                                    ( @(q.Customer?.Name ?? "ลูกค้าผู้ว่าจ้าง") )<br />
+                                    วันที่ ......... / ......... / .................
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <!-- Document Footer -->
+                    <div class="doc-footer-bar">
+                        <span>แบบฟอร์มรายงานสรุปผลและส่งมอบงานโครงการ (Form: EPX-RPT-01) | @companyConfig.Name</span>
+                        <span>เอกสารออกโดยระบบคอมพิวเตอร์ | หน้า 1/1</span>
                     </div>
                 </div>
             }
         }
         else
         {
-            <div class="text-center text-muted py-5" style="border: 1px dashed #cbd5e1; border-radius: 8px;">
+            <div class="doc-sheet text-center text-muted py-5">
                 <i class="bi bi-inbox" style="font-size: 2.5rem; display: block; margin-bottom: 10px; color: #94a3b8;"></i>
                 <span style="font-size: 1.05rem;">ไม่พบข้อมูลโครงการหรือใบเสนอราคาในช่วงเวลาที่เลือก</span>
             </div>
         }
     }
 
-    <!-- 2. Quotation Table Report -->
+    <!-- 2. Quotation Table Report (รายงานสรุปใบเสนอราคา) -->
     @if (reportType == "Quotation")
     {
-        <div class="custom-table-container text-dark" style="border: 1px solid #ddd;">
-            <table class="custom-table">
+        <div class="doc-sheet text-dark">
+            <!-- Letterhead -->
+            <table class="doc-header-table">
+                <tr>
+                    <td style="width: 60%;">
+                        <div style="display: flex; align-items: center;">
+                            <img src="images/logo.png" alt="Company Logo" class="doc-logo-img" />
+                            <div>
+                                <h3 class="doc-company-title">@companyConfig.Name</h3>
+                                <p class="doc-company-info">
+                                    @companyConfig.Address<br />
+                                    โทร: @companyConfig.Phone | อีเมล: @companyConfig.Email<br />
+                                    <span style="white-space: nowrap;">เลขประจำตัวผู้เสียภาษี: @companyConfig.TaxId</span>
+                                </p>
+                            </div>
+                        </div>
+                    </td>
+                    <td style="width: 40%; text-align: right;">
+                        <h2 class="doc-title-main">รายงานสรุปใบเสนอราคา</h2>
+                        <div class="doc-title-en">QUOTATION SUMMARY REPORT</div>
+                        <div style="font-size: 0.76rem; color: #475569;">
+                            ช่วงวันที่: <strong>@startDate.ToString("dd/MM/yyyy")</strong> - <strong>@endDate.ToString("dd/MM/yyyy")</strong><br />
+                            พิมพ์เมื่อ: @DateTime.Now.ToString("dd/MM/yyyy HH:mm")
+                        </div>
+                    </td>
+                </tr>
+            </table>
+
+            <div class="doc-double-divider"></div>
+
+            <table class="doc-grid-table">
                 <thead>
-                    <tr style="background-color: #f8fafc;">
-                        <th>เลขที่ใบเสนอราคา</th>
-                        <th>ลูกค้า</th>
+                    <tr>
+                        <th style="width: 12%;">เลขที่</th>
+                        <th style="width: 22%;">ลูกค้า</th>
                         <th>รายละเอียดงาน</th>
-                        <th class="text-end">พื้นที่ (ตร.ม.)</th>
-                        <th class="text-end">ราคารวมโครงการ</th>
-                        <th class="text-end">ยอดมัดจำ</th>
-                        <th>สถานะใบเสนอราคา</th>
-                        <th>วันที่ออกเอกสาร</th>
+                        <th style="width: 10%; text-align: right;">พื้นที่ (ตร.ม.)</th>
+                        <th style="width: 14%; text-align: right;">ราคารวม (บาท)</th>
+                        <th style="width: 13%; text-align: right;">มัดจำ (บาท)</th>
+                        <th style="width: 12%;">สถานะ</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -477,52 +798,85 @@
                         @foreach (var q in quotationsReport)
                         {
                             <tr>
-                                <td>QT-@q.Id</td>
+                                <td style="text-align: center; font-weight: 700;">QT-@q.Id</td>
                                 <td><strong>@q.Customer?.Name</strong></td>
                                 <td>@q.JobDescription</td>
-                                <td class="text-end">@q.AreaSqm.ToString("N0")</td>
-                                <td class="text-end">฿@q.TotalPrice.ToString("N0")</td>
-                                <td class="text-end">฿@q.DepositAmount.ToString("N0")</td>
-                                <td>
-                                    <span class="badge-status badge-@q.Status.ToString().ToLower()">
-                                        @GetQuotationStatusName(q.Status)
-                                    </span>
-                                </td>
-                                <td>@q.CreatedDate.ToString("dd/MM/yyyy")</td>
+                                <td style="text-align: right;">@q.AreaSqm.ToString("N0")</td>
+                                <td style="text-align: right; font-weight: 600;">฿@q.TotalPrice.ToString("N0")</td>
+                                <td style="text-align: right; color: #15803d;">฿@q.DepositAmount.ToString("N0")</td>
+                                <td style="text-align: center;">@GetQuotationStatusName(q.Status)</td>
                             </tr>
                         }
-                        <tr class="table-active font-weight-bold" style="background-color: #f1f5f9; font-weight: bold;">
-                            <td colspan="4" class="text-end">รวมราคาสุทธิใบเสนอราคา:</td>
-                            <td class="text-end" style="color: var(--primary); font-size: 1.05rem;">฿@totalQuotationSum.ToString("N0")</td>
-                            <td class="text-end" style="color: var(--success);">฿@totalQuotationDepositSum.ToString("N0")</td>
-                            <td colspan="2"></td>
+                        <tr style="background-color: #f1f5f9; font-weight: bold;">
+                            <td colspan="4" style="text-align: right;">รวมยอดทั้งสิ้น (@quotationsReport.Count รายการ):</td>
+                            <td style="text-align: right; color: #0f2444; font-size: 0.85rem;">฿@totalQuotationSum.ToString("N0")</td>
+                            <td style="text-align: right; color: #15803d; font-size: 0.85rem;">฿@totalQuotationDepositSum.ToString("N0")</td>
+                            <td></td>
                         </tr>
                     }
                     else
                     {
                         <tr>
-                            <td colspan="8" class="text-center text-muted py-4">ไม่พบใบเสนอราคาในช่วงเวลาที่เลือก</td>
+                            <td colspan="7" class="text-center text-muted py-4">ไม่พบใบเสนอราคาในช่วงเวลาที่เลือก</td>
                         </tr>
                     }
                 </tbody>
             </table>
+
+            <div class="mt-4 text-end" style="font-size: 0.78rem; color: #334155; margin-top: 30px;">
+                <p>เจ้าหน้าที่ผู้จัดทำรายงาน: .................................................... ( @(AuthService.CurrentUser?.FullName ?? "ผู้เสนอรายงาน") )</p>
+                <p style="font-size: 0.7rem; color: #64748b;">วันที่ออกรายงาน: @DateTime.Today.ToString("dd MMMM yyyy")</p>
+            </div>
+
+            <div class="doc-footer-bar">
+                <span>แบบฟอร์มรายงานสรุปใบเสนอราคา | @companyConfig.Name</span>
+                <span>เอกสารออกโดยระบบคอมพิวเตอร์ | หน้า 1/1</span>
+            </div>
         </div>
     }
 
-    <!-- 3. Receipt Report -->
+    <!-- 3. Receipt Report (รายงานสรุปใบเสร็จรับเงิน) -->
     @if (reportType == "Receipt")
     {
-        <div class="custom-table-container text-dark" style="border: 1px solid #ddd;">
-            <table class="custom-table">
+        <div class="doc-sheet text-dark">
+            <!-- Letterhead -->
+            <table class="doc-header-table">
+                <tr>
+                    <td style="width: 60%;">
+                        <div style="display: flex; align-items: center;">
+                            <img src="images/logo.png" alt="Company Logo" class="doc-logo-img" />
+                            <div>
+                                <h3 class="doc-company-title">@companyConfig.Name</h3>
+                                <p class="doc-company-info">
+                                    @companyConfig.Address<br />
+                                    โทร: @companyConfig.Phone | อีเมล: @companyConfig.Email<br />
+                                    <span style="white-space: nowrap;">เลขประจำตัวผู้เสียภาษี: @companyConfig.TaxId</span>
+                                </p>
+                            </div>
+                        </div>
+                    </td>
+                    <td style="width: 40%; text-align: right;">
+                        <h2 class="doc-title-main">รายงานสรุปการรับเงิน</h2>
+                        <div class="doc-title-en">RECEIPT & INCOME STATEMENT</div>
+                        <div style="font-size: 0.76rem; color: #475569;">
+                            ช่วงวันที่: <strong>@startDate.ToString("dd/MM/yyyy")</strong> - <strong>@endDate.ToString("dd/MM/yyyy")</strong><br />
+                            พิมพ์เมื่อ: @DateTime.Now.ToString("dd/MM/yyyy HH:mm")
+                        </div>
+                    </td>
+                </tr>
+            </table>
+
+            <div class="doc-double-divider"></div>
+
+            <table class="doc-grid-table">
                 <thead>
-                    <tr style="background-color: #f8fafc;">
-                        <th>เลขที่ใบสำคัญการรับเงิน</th>
-                        <th>ประเภทรายรับ</th>
-                        <th>รายละเอียดผู้ชำระเงิน</th>
-                        <th>คำอธิบายบันทึกรายรับ</th>
-                        <th>เลขอ้างอิงใบเสร็จ</th>
-                        <th>วันที่ได้รับเงิน</th>
-                        <th class="text-end">จำนวนเงินที่ได้รับ</th>
+                    <tr>
+                        <th style="width: 14%;">เลขที่ใบสำคัญ</th>
+                        <th style="width: 12%;">วันที่</th>
+                        <th style="width: 22%;">ผู้ชำระเงิน</th>
+                        <th>คำอธิบายรายการรับเงิน</th>
+                        <th style="width: 16%;">เลขอ้างอิง</th>
+                        <th style="width: 16%; text-align: right;">จำนวนเงิน (บาท)</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -531,40 +885,39 @@
                         @foreach (var f in financesReport)
                         {
                             <tr>
-                                <td>FIN-@f.Id</td>
-                                <td>
-                                    <span class="badge-status badge-approved">รายรับ</span>
-                                </td>
+                                <td style="text-align: center; font-weight: 700;">FIN-@f.Id</td>
+                                <td style="text-align: center;">@f.RecordedDate.ToString("dd/MM/yyyy")</td>
                                 <td><strong>@(f.Quotation?.Customer?.Name ?? "-")</strong></td>
                                 <td>@f.Description</td>
-                                <td>@(string.IsNullOrEmpty(f.ReferenceNo) ? "-" : f.ReferenceNo)</td>
-                                <td>@f.RecordedDate.ToString("dd/MM/yyyy")</td>
-                                <td class="text-end" style="font-weight: bold; color: var(--success);">
-                                    ฿@f.Amount.ToString("N0")
-                                </td>
+                                <td style="text-align: center;">@(string.IsNullOrEmpty(f.ReferenceNo) ? "-" : f.ReferenceNo)</td>
+                                <td style="text-align: right; font-weight: 600; color: #15803d;">฿@f.Amount.ToString("N0")</td>
                             </tr>
                         }
-                        <tr class="table-active font-weight-bold" style="background-color: #f1f5f9; font-weight: bold;">
-                            <td colspan="6" class="text-end">รวมยอดรับเงินสดทั้งสิ้น:</td>
-                            <td class="text-end" style="color: var(--success); font-size: 1.1rem;">
-                                ฿@totalReceiptSum.ToString("N0")
-                            </td>
+                        <tr style="background-color: #f1f5f9; font-weight: bold;">
+                            <td colspan="5" style="text-align: right;">รวมยอดรับเงินสดทั้งสิ้น (@financesReport.Count รายการ):</td>
+                            <td style="text-align: right; color: #15803d; font-size: 0.9rem;">฿@totalReceiptSum.ToString("N0")</td>
                         </tr>
                     }
                     else
                     {
                         <tr>
-                            <td colspan="7" class="text-center text-muted py-4">ไม่พบประวัติการรับเงินในช่วงเวลาที่เลือก</td>
+                            <td colspan="6" class="text-center text-muted py-4">ไม่พบประวัติการรับเงินในช่วงเวลาที่เลือก</td>
                         </tr>
                     }
                 </tbody>
             </table>
+
+            <div class="mt-4 text-end" style="font-size: 0.78rem; color: #334155; margin-top: 30px;">
+                <p>เจ้าหน้าที่ผู้ตรวจสอบบัญชี: .................................................... ( @(AuthService.CurrentUser?.FullName ?? "ผู้เสนอรายงาน") )</p>
+                <p style="font-size: 0.7rem; color: #64748b;">วันที่ออกรายงาน: @DateTime.Today.ToString("dd MMMM yyyy")</p>
+            </div>
+
+            <div class="doc-footer-bar">
+                <span>แบบฟอร์มรายงานสรุปการรับเงิน | @companyConfig.Name</span>
+                <span>เอกสารออกโดยระบบคอมพิวเตอร์ | หน้า 1/1</span>
+            </div>
         </div>
     }
-
-    <div class="mt-4 text-dark text-end print-signatures d-none d-print-block" style="font-size: 0.82rem; color: #64748b;">
-        <p>เจ้าหน้าที่ผู้ออกรายงาน: .................................................... ( @(AuthService.CurrentUser?.FullName ?? "ผู้เสนอรายงาน") )</p>
-    </div>
 </div>
 
 <!-- Image Lightbox Modal -->
@@ -609,6 +962,7 @@
     private decimal totalReceiptSum = 0;
 
     private bool isPrinting = false;
+    private CompanyProfile companyConfig = new();
 
     // Lightbox Modal
     private bool isImageModalOpen = false;
@@ -617,6 +971,7 @@
 
     protected override void OnInitialized()
     {
+        companyConfig = Db.CompanyProfiles.FirstOrDefault() ?? new CompanyProfile();
         LoadAllQuotationsFilter();
         RunReport();
     }

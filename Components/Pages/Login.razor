@@ -111,14 +111,8 @@
         }
         catch (Exception ex)
         {
-            if (ex.Message.Contains("transient failure") || ex.Message.Contains("Unable to connect") || ex.Message.Contains("Connection refused"))
-            {
-                errorMessage = "ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กำลังเชื่อมต่อใหม่ กรุณาลองอีกครั้ง";
-            }
-            else
-            {
-                errorMessage = "เกิดข้อผิดพลาด: " + ex.Message;
-            }
+            var detail = ex.InnerException != null ? $"{ex.Message} -> รายละเอียด: {ex.InnerException.Message}" : ex.Message;
+            errorMessage = "เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล: " + detail;
             isLoading = false;
         }
     }

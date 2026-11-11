@@ -467,20 +467,21 @@
             </div>
 
             <!-- Printable Document Body -->
-            <div class="print-header" style="border-bottom: 2px solid #0f2444; padding-bottom: 16px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
-                <div style="display: flex; align-items: center; gap: 16px; text-align: left;">
-                    <img src="images/logo.png" alt="Company Logo" style="height: 68px; width: 68px; object-fit: cover; border-radius: 8px; border: 1px solid #e2e8f0; box-shadow: 0 2px 6px rgba(0,0,0,0.06);" />
-                    <div class="print-company-info">
+            <div class="print-header" style="border-bottom: 2px solid #0f2444; padding-bottom: 16px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; gap: 20px;">
+                <div style="display: flex; align-items: center; gap: 16px; text-align: left; flex: 1; min-width: 0;">
+                    <img src="images/logo.png" alt="Company Logo" style="height: 68px; width: 68px; object-fit: cover; border-radius: 8px; border: 1px solid #e2e8f0; box-shadow: 0 2px 6px rgba(0,0,0,0.06); flex-shrink: 0;" />
+                    <div class="print-company-info" style="min-width: 0;">
                         <h2 style="margin: 0 0 4px 0; color: #0f2444; font-size: 1.35rem; font-weight: 800;">@companyConfig.Name</h2>
                         <p style="font-size: 0.82rem; margin: 0; color: #475569; line-height: 1.45;">
                             @companyConfig.Address<br />
-                            โทร: @companyConfig.Phone | อีเมล: @companyConfig.Email | เลขผู้เสียภาษี: @companyConfig.TaxId
+                            โทร: @companyConfig.Phone | อีเมล: @companyConfig.Email<br />
+                            <span style="white-space: nowrap;">เลขประจำตัวผู้เสียภาษี: @companyConfig.TaxId</span>
                         </p>
                     </div>
                 </div>
-                <div class="print-title-area" style="text-align: right;">
-                    <h1 style="margin: 0; font-size: 1.75rem; color: #0f2444; font-weight: 800;">รายงานความคืบหน้า</h1>
-                    <span style="font-size: 0.95rem; font-weight: 700; color: var(--primary);">PROGRESS REPORT</span>
+                <div class="print-title-area" style="text-align: right; flex-shrink: 0; white-space: nowrap;">
+                    <h1 style="margin: 0; font-size: 1.75rem; color: #0f2444; font-weight: 800; white-space: nowrap;">รายงานความคืบหน้า</h1>
+                    <span style="font-size: 0.95rem; font-weight: 700; color: var(--primary); white-space: nowrap;">PROGRESS REPORT</span>
                 </div>
             </div>
 
@@ -639,20 +640,21 @@
             </div>
 
             <!-- Receipt Document Body -->
-            <div class="print-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f2444; padding-bottom: 16px; margin-bottom: 20px;">
-                <div style="display: flex; align-items: center; gap: 16px;">
-                    <img src="images/logo.png" alt="Company Logo" style="height: 68px; width: 68px; object-fit: cover; border-radius: 8px; border: 1px solid #e2e8f0; box-shadow: 0 2px 6px rgba(0,0,0,0.06);" />
-                    <div class="print-company-info">
+            <div class="print-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f2444; padding-bottom: 16px; margin-bottom: 20px; gap: 20px;">
+                <div style="display: flex; align-items: center; gap: 16px; flex: 1; min-width: 0;">
+                    <img src="images/logo.png" alt="Company Logo" style="height: 68px; width: 68px; object-fit: cover; border-radius: 8px; border: 1px solid #e2e8f0; box-shadow: 0 2px 6px rgba(0,0,0,0.06); flex-shrink: 0;" />
+                    <div class="print-company-info" style="min-width: 0;">
                         <h2 style="margin: 0 0 4px 0; color: #0f2444; font-size: 1.35rem; font-weight: 800;">@companyConfig.Name</h2>
                         <p style="font-size: 0.82rem; margin: 0; color: #475569; line-height: 1.45;">
                             @companyConfig.Address<br />
-                            โทร: @companyConfig.Phone | อีเมล: @companyConfig.Email | เลขผู้เสียภาษี: @companyConfig.TaxId
+                            โทร: @companyConfig.Phone | อีเมล: @companyConfig.Email<br />
+                            <span style="white-space: nowrap;">เลขประจำตัวผู้เสียภาษี: @companyConfig.TaxId</span>
                         </p>
                     </div>
                 </div>
-                <div class="print-title-area" style="text-align: right;">
-                    <h1 style="margin: 0; font-size: 1.8rem; font-weight: 800; color: #0f2444;">ใบเสร็จรับเงิน</h1>
-                    <span style="font-size: 0.95rem; font-weight: bold; color: var(--success);">RECEIPT</span>
+                <div class="print-title-area" style="text-align: right; flex-shrink: 0; white-space: nowrap;">
+                    <h1 style="margin: 0; font-size: 1.8rem; font-weight: 800; color: #0f2444; white-space: nowrap;">ใบเสร็จรับเงิน</h1>
+                    <span style="font-size: 0.95rem; font-weight: bold; color: var(--success); white-space: nowrap;">RECEIPT</span>
                 </div>
             </div>
 
@@ -694,43 +696,45 @@
                 </tbody>
             </table>
 
-            <div class="print-summary-area text-dark" style="margin-bottom: 20px;">
-                <table class="print-summary-table">
+            <div class="print-summary-area text-dark" style="margin-bottom: 24px;">
+                <table class="print-summary-table" style="width: 380px; max-width: 100%;">
                     <tr>
-                        <td>รับเงินมัดจำล่วงหน้า (แล้ว)</td>
-                        <td class="text-end">฿@selectedReceiptProject.Quotation?.DepositAmount.ToString("N0")</td>
+                        <td style="white-space: nowrap;">รับเงินมัดจำล่วงหน้า (แล้ว)</td>
+                        <td class="text-end" style="white-space: nowrap;">฿@selectedReceiptProject.Quotation?.DepositAmount.ToString("N0")</td>
                     </tr>
                     <tr>
-                        <td>รับเงินงวดสุดท้าย (แล้ว)</td>
-                        <td class="text-end">฿@selectedReceiptProject.Quotation?.BalanceAmount.ToString("N0")</td>
+                        <td style="white-space: nowrap;">รับเงินงวดสุดท้าย (แล้ว)</td>
+                        <td class="text-end" style="white-space: nowrap;">฿@selectedReceiptProject.Quotation?.BalanceAmount.ToString("N0")</td>
                     </tr>
                     @if (selectedReceiptProject.LatePenaltyAmount > 0)
                     {
                         <tr>
-                            <td style="color: #dc2626;">ค่าปรับชำระเงินล่าช้า (@selectedReceiptProject.OverdueDays วัน × 3%/วัน)</td>
-                            <td class="text-end" style="color: #dc2626; font-weight: bold;">+ ฿@selectedReceiptProject.LatePenaltyAmount.ToString("N0")</td>
+                            <td style="color: #dc2626; white-space: nowrap;">ค่าปรับชำระเงินล่าช้า (@selectedReceiptProject.OverdueDays วัน × 3%/วัน)</td>
+                            <td class="text-end" style="color: #dc2626; font-weight: bold; white-space: nowrap;">+ ฿@selectedReceiptProject.LatePenaltyAmount.ToString("N0")</td>
                         </tr>
                     }
-                    <tr class="total-row" style="color: var(--success);">
-                        <td>ยอดเงินชำระครบถ้วนสุทธิ</td>
-                        <td class="text-end">฿@((selectedReceiptProject.Quotation?.DepositAmount ?? 0) + selectedReceiptProject.TotalPayableAmount).ToString("N0")</td>
+                    <tr class="total-row">
+                        <td style="white-space: nowrap; font-weight: 700;">ยอดเงินชำระครบถ้วนสุทธิ</td>
+                        <td class="text-end" style="white-space: nowrap; font-weight: 800;">฿@(((selectedReceiptProject.Quotation?.DepositAmount ?? 0) + selectedReceiptProject.TotalPayableAmount).ToString("N0"))</td>
                     </tr>
                 </table>
             </div>
 
-            <div class="print-signatures text-dark" style="margin-top: 45px;">
+            <div class="print-signatures text-dark" style="margin-top: 40px;">
                 <div>
-                    <p>ผู้ชำระเงิน</p>
-                    <div class="signature-line">
-                        ลงชื่อ......................................................<br />
-                        วันที่ ......./......./.......
+                    <p style="font-weight: 600; margin-bottom: 30px;">ผู้ชำระเงิน</p>
+                    <div class="signature-line" style="border-top: none;">
+                        ลงชื่อ ................................................................<br />
+                        ( ................................................................ )<br />
+                        วันที่ ......... / ......... / .................
                     </div>
                 </div>
                 <div>
-                    <p>ผู้รับเงิน / เจ้าหน้าที่การเงิน</p>
-                    <div class="signature-line">
-                        ลงชื่อ......................................................<br />
-                        วันที่ ......./......./.......
+                    <p style="font-weight: 600; margin-bottom: 30px;">ผู้รับเงิน / เจ้าหน้าที่การเงิน</p>
+                    <div class="signature-line" style="border-top: none;">
+                        ลงชื่อ ................................................................<br />
+                        ( @(AuthService.CurrentUser?.FullName ?? "ฝ่ายบัญชีการเงิน") )<br />
+                        วันที่ ......... / ......... / .................
                     </div>
                 </div>
             </div>
